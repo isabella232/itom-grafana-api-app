@@ -380,26 +380,30 @@ GrafanaMetricData.prototype = {
 		return JSON.stringify(returnValues);
 	},
 	getOutageStatus: function (ciIds, showPercent) {
-		var outageStatus = [];
-		if (ciIds != "") {
-			var cis = this.getValuesByNameMatch(ciIds, ",");
-			for (var i = 0; i < cis.length; i++) {
-				var ciName = this.getCINameByID(cis[i]);
-				outageStatus.push(this.getOutageByCI(cis[i], ciName, showPercent));
+		try {
+			var outageStatus = [];
+			if (ciIds != "") {
+				var cis = this.getValuesByNameMatch(ciIds, ",");
+				for (var i = 0; i < cis.length; i++) {
+					var ciName = this.getCINameByID(cis[i]);
+					outageStatus.push(this.getOutageByCI(cis[i], ciName, showPercent));
+				}
+			} else {
+				var serviceGr = new GlideRecord("cmdb_ci_service_discovered");
+				serviceGr.addQuery("operational_status", 1);
+				serviceGr.orderBy("name");
+				serviceGr.setLimit(250);
+				serviceGr.query();
+				while(serviceGr.next()) {
+					var sys_id = serviceGr.getValue("sys_id");
+					var name = serviceGr.getDisplayValue("name");
+					outageStatus.push(this.getOutageByCI(sys_id, name, showPercent));
+				}
 			}
-		} else {
-			var serviceGr = new GlideRecord("cmdb_ci_service_discovered");
-			serviceGr.addQuery("operational_status", 1);
-			serviceGr.orderBy("name");
-			serviceGr.setLimit(250);
-			serviceGr.query();
-			while(serviceGr.next()) {
-				var sys_id = serviceGr.getValue("sys_id");
-				var name = serviceGr.getDisplayValue("name");
-				outageStatus.push(this.getOutageByCI(sys_id, name, showPercent));
-			}
+			return JSON.stringify(outageStatus);
+		} catch (e) {
+			return e;
 		}
-		return JSON.stringify(outageStatus);
 	},
 	getGenericTrend: function (table, sysparam, esSearch, trendColumn, trendBy, value, startTimeInput, endTimeInput) {
 		var result = [{datapoints: []}];
@@ -1496,24 +1500,16 @@ GrafanaMetricData.prototype = {
 					var end = new GlideDateTime(outageGr.getValue("end"));
 					var type = outageGr.getDisplayValue("type");
 					
-					if (end) {
-						if (begin) {
-							outages.datapoints.push([type, begin.getNumericValue()]);
+					if (begin) {
+						outages.datapoints.push([type, begin.getNumericValue()]);
+						if (end) {
 							outages.datapoints.push(["Operational", end.getNumericValue()]);
+						} else {
+							outages.datapoints.push([type, date.getNumericValue()]);
 						}
-					} else {
-						if (begin) {
-							var alreadyContains = false;
-							for (var d = 0; d < outages.datapoints.length; i++) {
-								if (outages.datapoints[i][0] == type && outages.datapoints[i][0] == begin.getNumericValue())
-									alreadyContains = true;
-							}
-							if (!alreadyContains) {
-								outages.datapoints.push([type, begin.getNumericValue()]);
-							}
-						}
+							
 					}
-						
+					
 					if (begin && end)
 						actualUptime -= (end.getNumericValue()*0.001) - (begin.getNumericValue()*0.001);
 				}
@@ -1791,13 +1787,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>4</sys_mod_count>
+        <sys_mod_count>9</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-01 18:12:15</sys_updated_on>
+        <sys_updated_on>2021-09-01 18:22:07</sys_updated_on>
     </sys_script_include>
 </record_update>
