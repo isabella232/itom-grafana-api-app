@@ -123,7 +123,7 @@ GrafanaMetricData.prototype = {
 		returnMetrics.sort();
 		return JSON.stringify(returnMetrics);
 	},
-	getNestedCIS: function(ciId, parentDepth, childDepth, namespaceInput, excluded_classes, type, dependsOnFilter) {
+	getNestedCIS: function(ciId, parentDepth, childDepth, sysparam, type) {
 		try {
 			var returnValues = [];
 			var returnValueIds = [];
@@ -133,20 +133,6 @@ GrafanaMetricData.prototype = {
 				originalIdList.push(ciId);
 				idList.push(ciId);
 			}
-			var filterClasses = [];
-			if (excluded_classes.indexOf("|") != -1) {
-				filterClasses = this.getValuesByNameMatch(excluded_classes, "|");
-			} else {
-				filterClasses = this.getValuesByNameMatch(excluded_classes, ",");
-			}
-			var namespaces = [];
-			if (namespaceInput != "") {
-				if (namespaceInput.indexOf("|") != -1) {
-					namespaces = this.getValuesByNameMatch(namespaceInput, "|");
-				} else {
-					namespaces = this.getValuesByNameMatch(namespaceInput, ",");
-				}
-			}
 			if (type == "class") returnValues.push({ name: "None", id: ""});
 			while (parentDepth > 0) {
 				var nextIdList = [];
@@ -154,87 +140,39 @@ GrafanaMetricData.prototype = {
 					var currentId = idList.pop();
 					var parentGR = new GlideRecord("cmdb_rel_ci");
 					parentGR.addQuery("child.sys_id", currentId);
-					if (dependsOnFilter == "true") {
-						parentGR.addEncodedQuery("type.name=Depends on::Used by");
-					}
+					if (sysparam != "")
+						parentGR.addEncodedQuery(sysparam);
+					
 					parentGR.query();
-					if (parentGR.hasNext()) {
-						while (parentGR.next()) {
-							var parentObj = {};
-							var childObj = {};
-							parentObj.name = parentGR.parent.name.getDisplayValue();
-							parentObj.id = parentGR.parent.sys_id.toString();
-							childObj.name = parentGR.child.name.getDisplayValue();
-							childObj.id = parentGR.child.sys_id.toString();
+					while (parentGR.next()) {
+						var parentObj = {};
+						var childObj = {};
+						parentObj.name = parentGR.parent.name.getDisplayValue();
+						parentObj.id = parentGR.parent.sys_id.toString();
+						childObj.name = parentGR.child.name.getDisplayValue();
+						childObj.id = parentGR.child.sys_id.toString();
 
-							var parent_id = parentObj.id;
+						var parent_id = parentObj.id;
 
-							var parent_class = parentGR.parent.sys_class_name.getDisplayValue();
-							var parent_class_value = parentGR.parent.sys_class_name.toString();
-							var child_class = parentGR.child.sys_class_name.getDisplayValue();
-							var child_class_value = parentGR.child.sys_class_name.toString();
-							
-							var child_namespace = "";
-							var parent_namespace = "";
-							try {
-								child_namespace = parentGR.child.namespace.getDisplayValue();
-								parent_namespace = parentGR.parent.namespace.getDisplayValue();
-							} catch (e) {}
-							
-							if (!parentObj.name.includes("Manual Endpoint") && !childObj.name.includes("Manual Endpoint")) {
-								var matchNamespace = false;
-								if (namespaces.length > 0 && child_namespace != "" && parent_namespace != "") {
-									namespaces.map(function(namespace) {
-										if (namespace == parent_namespace || namespace == child_namespace) {
-											matchNamespace = true;
-										}
-									});
-								} else {
-									matchNamespace = true;
-								}
-								if (matchNamespace == true) {
-									var matchFilterClass = false;
-									filterClasses.map(function(filter) {
-										if (filter == parent_class || filter == child_class
-											|| filter == parent_class_value || filter == child_class_value) matchFilterClass = true;
-									});
-									if (!matchFilterClass) {
-										if (type == "class") {
-											parentObj.name = parent_class;
-											parentObj.id = parent_class_value;
-											childObj.name = child_class;
-											childObj.id = child_class_value;
-										}
-										if (returnValueIds.indexOf(parentObj.id) == -1) {
-											returnValueIds.push(parentObj.id);
-											returnValues.push(parentObj);
-										}
-										if (returnValueIds.indexOf(childObj.id) == -1) {
-											returnValueIds.push(childObj.id);
-											returnValues.push(childObj);
-										}
-										nextIdList.push(parent_id);					
-									}
-								}
-							}
+						var parent_class = parentGR.parent.sys_class_name.getDisplayValue();
+						var parent_class_value = parentGR.parent.sys_class_name.toString();
+						var child_class = parentGR.child.sys_class_name.getDisplayValue();
+						var child_class_value = parentGR.child.sys_class_name.toString();
+						if (type == "class") {
+							parentObj.name = parent_class;
+							parentObj.id = parent_class_value;
+							childObj.name = child_class;
+							childObj.id = child_class_value;
 						}
-					} else {
-						var soloGR = new GlideRecord("cmdb_ci");
-						soloGR.addQuery("sys_id", currentId);
-						soloGR.query();
-						if (soloGR.next()) {
-							var soloObj = {};
-							soloObj.name = soloGR.getDisplayValue("name");
-							soloObj.id = soloGR.getValue("sys_id");
-							if (type == "class") {
-								soloObj.name = soloGR.getDisplayValue("sys_class_name");
-								soloObj.id = soloGR.getValue("sys_class_name");
-							}
-							if (returnValueIds.indexOf(soloObj.id) == -1) {
-								returnValueIds.push(soloObj.id);
-								returnValues.push(soloObj);
-							}
+						if (returnValueIds.indexOf(parentObj.id) == -1) {
+							returnValueIds.push(parentObj.id);
+							returnValues.push(parentObj);
 						}
+						if (returnValueIds.indexOf(childObj.id) == -1) {
+							returnValueIds.push(childObj.id);
+							returnValues.push(childObj);
+						}
+						nextIdList.push(parent_id);
 					}
 				}
 				idList = nextIdList;
@@ -251,86 +189,39 @@ GrafanaMetricData.prototype = {
 					var currentId = idList.pop();
 					var childGR = new GlideRecord("cmdb_rel_ci");
 					childGR.addQuery("parent.sys_id", currentId);
-					if (dependsOnFilter == "true") {
-						childGR.addEncodedQuery("type.name=Depends on::Used by");
-					}
+					if (sysparam != "")
+						childGR.addEncodedQuery(sysparam);
+					
 					childGR.query();
-					if (childGR.hasNext()) {
-						while (childGR.next()) {
-							var parentObj = {};
-							var childObj = {};
-							parentObj.name = childGR.parent.name.getDisplayValue();
-							parentObj.id = childGR.parent.sys_id.toString();
-							childObj.name = childGR.child.name.getDisplayValue();
-							childObj.id = childGR.child.sys_id.toString();
+					while (childGR.next()) {
+						var parentObj = {};
+						var childObj = {};
+						parentObj.name = childGR.parent.name.getDisplayValue();
+						parentObj.id = childGR.parent.sys_id.toString();
+						childObj.name = childGR.child.name.getDisplayValue();
+						childObj.id = childGR.child.sys_id.toString();
+						
+						var child_id = childObj.id;
 
-							var parent_class = childGR.parent.sys_class_name.getDisplayValue();
-							var parent_class_value = childGR.parent.sys_class_name.toString();
-							var child_id = childObj.id;
-							var child_class = childGR.child.sys_class_name.getDisplayValue();
-							var child_class_value = childGR.child.sys_class_name.toString();
-							
-							var child_namespace = "";
-							var parent_namespace = "";
-							try {
-								child_namespace = childGR.child.namespace.getDisplayValue();
-								parent_namespace = childGR.parent.namespace.getDisplayValue();
-							} catch (e) {}
-							
-							if (!parentObj.name.includes("Manual Endpoint") && !childObj.name.includes("Manual Endpoint")) {
-								var matchNamespace = false;
-								if (namespaces.length > 0 && child_namespace != "" && parent_namespace != "") {
-									namespaces.map(function(namespace) {
-										if (namespace == parent_namespace || namespace == child_namespace) {
-											matchNamespace = true;
-										}
-									});
-								} else {
-									matchNamespace = true;
-								}
-								if (matchNamespace == true) {
-									var matchFilterClass = false;
-									filterClasses.map(function(filter) {
-										if (filter == parent_class || filter == child_class
-											|| filter == parent_class_value || filter == child_class_value) matchFilterClass = true;
-									});
-									if (!matchFilterClass) {
-										if (type == "class") {
-											parentObj.name = parent_class;
-											parentObj.id = parent_class_value;
-											childObj.name = child_class;
-											childObj.id = child_class_value;
-										}
-										if (returnValueIds.indexOf(parentObj.id) == -1) {
-											returnValueIds.push(parentObj.id);
-											returnValues.push(parentObj);
-										}
-										if (returnValueIds.indexOf(childObj.id) == -1) {
-											returnValueIds.push(childObj.id);
-											returnValues.push(childObj);
-										}
-										nextIdList.push(child_id);
-									}
-								}
-							}
+						var parent_class = childGR.parent.sys_class_name.getDisplayValue();
+						var parent_class_value = childGR.parent.sys_class_name.toString();
+						var child_class = childGR.child.sys_class_name.getDisplayValue();
+						var child_class_value = childGR.child.sys_class_name.toString();
+						if (type == "class") {
+							parentObj.name = parent_class;
+							parentObj.id = parent_class_value;
+							childObj.name = child_class;
+							childObj.id = child_class_value;
 						}
-					} else {
-						var soloGR = new GlideRecord("cmdb_ci");
-						soloGR.addQuery("sys_id", currentId);
-						soloGR.query();
-						if (soloGR.next()) {
-							var soloObj = {};
-							soloObj.name = soloGR.getDisplayValue("name");
-							soloObj.id = soloGR.getValue("sys_id");
-							if (type == "class") {
-								soloObj.name = soloGR.getDisplayValue("sys_class_name");
-								soloObj.id = soloGR.getValue("sys_class_name");
-							}
-							if (returnValueIds.indexOf(soloObj.id) == -1) {
-								returnValueIds.push(soloObj.id);
-								returnValues.push(soloObj);
-							}
+						if (returnValueIds.indexOf(parentObj.id) == -1) {
+							returnValueIds.push(parentObj.id);
+							returnValues.push(parentObj);
 						}
+						if (returnValueIds.indexOf(childObj.id) == -1) {
+							returnValueIds.push(childObj.id);
+							returnValues.push(childObj);
+						}
+						nextIdList.push(child_id);
 					}
 				}
 				idList = nextIdList;
@@ -340,7 +231,6 @@ GrafanaMetricData.prototype = {
 		} catch (e) {
 			return e;
 		}
-		
 	},
 	getGenericVariable: function (table, nameColumn, idColumn, sysparam) {
 		var returnValues = [];
@@ -379,26 +269,21 @@ GrafanaMetricData.prototype = {
 		}
 		return JSON.stringify(returnValues);
 	},
-	getOutageStatus: function (ciIds, showPercent) {
+	getOutageStatus: function (ciIds, showPercent, sysparam) {
 		try {
 			var outageStatus = [];
-			if (ciIds != "") {
-				var cis = this.getValuesByNameMatch(ciIds, ",");
-				for (var i = 0; i < cis.length; i++) {
-					var ciName = this.getCINameByID(cis[i]);
-					outageStatus.push(this.getOutageByCI(cis[i], ciName, showPercent));
-				}
-			} else {
-				var serviceGr = new GlideRecord("cmdb_ci_service_discovered");
-				serviceGr.addQuery("operational_status", 1);
-				serviceGr.orderBy("name");
-				serviceGr.setLimit(250);
-				serviceGr.query();
-				while(serviceGr.next()) {
-					var sys_id = serviceGr.getValue("sys_id");
-					var name = serviceGr.getDisplayValue("name");
-					outageStatus.push(this.getOutageByCI(sys_id, name, showPercent));
-				}
+			var serviceGr = new GlideRecord("cmdb_ci_service_discovered");
+			if (ciIds != "")
+				serviceGr.addEncodedQuery("sys_idIN" + ciIds);
+			if (sysparam != "")
+				serviceGr.addEncodedQuery(sysparam);
+			serviceGr.orderBy("name");
+			serviceGr.setLimit(250);
+			serviceGr.query();
+			while (serviceGr.next()) {
+				var sys_id = serviceGr.getValue("sys_id");
+				var name = serviceGr.getDisplayValue("name");
+				outageStatus.push(this.getOutageByCI(sys_id, name, showPercent));
 			}
 			return JSON.stringify(outageStatus);
 		} catch (e) {
@@ -797,7 +682,7 @@ GrafanaMetricData.prototype = {
 			dataStr = dataStr.substring(0, dataStr.length - 1);
 		return "[" + dataStr + "]";
 	},
-	getTopology: function (serviceId, childDepth, parentDepth, excluded_classes, sysparam_query, namespaceInput, dependsOnFilter) {
+	getTopology: function (serviceId, childDepth, parentDepth, sysparam_query) {
 		var topologyRows='{"rows": [';
 		var childDepthLimit = 3;
 		var parentDepthLimit = 0;
@@ -805,20 +690,6 @@ GrafanaMetricData.prototype = {
 			childDepthLimit = childDepth;
 		if (parentDepth != "" && parentDepth >= 0)
 			parentDepthLimit = parentDepth;
-		var filterClasses = [];
-		if (excluded_classes.indexOf("|") != -1) {
-			filterClasses = this.getValuesByNameMatch(excluded_classes, "|");
-		} else {
-			filterClasses = this.getValuesByNameMatch(excluded_classes, ",");
-		}
-		var namespaces = [];
-		if (namespaceInput != "") {
-			if (namespaceInput.indexOf("|") != -1) {
-				namespaces = this.getValuesByNameMatch(namespaceInput, "|");
-			} else {
-				namespaces = this.getValuesByNameMatch(namespaceInput, ",");
-			}
-		}
 		var parentIds = [];
 		var originalIds = [];
 		if (serviceId != "") {
@@ -847,10 +718,9 @@ GrafanaMetricData.prototype = {
 					var childId = parentIds.pop();
 					var parentGR = new GlideRecord("cmdb_rel_ci");
 					parentGR.addQuery("child.sys_id", childId);
-					if (dependsOnFilter == "true") {
-						parentGR.addEncodedQuery("type.name=Depends on::Used by");
-					}
-					parentGR.addEncodedQuery(sysparam_query);
+					if (sysparam_query != "")
+						parentGR.addEncodedQuery(sysparam_query);
+					
 					parentGR.query();
 					if (parentGR.hasNext()) {
 						while (parentGR.next()) {
@@ -866,39 +736,12 @@ GrafanaMetricData.prototype = {
 							parentObj.child_name = parentObj.child_name.replace(/\\/g, "/");
 							parentObj.child_id = parentGR.child.sys_id.toString();
 							
-							parentObj.parent_namespace = "";
-							parentObj.child_namespace = "";
-							try {
-								parentObj.parent_namespace = parentGR.parent.namespace.getDisplayValue();
-								parentObj.child_namespace = parentGR.child.namespace.getDisplayValue();
-							} catch (e) {}
-							
-							if (!parentObj.parent_name.includes("Manual Endpoint") && !parentObj.child_name.includes("Manual Endpoint")) {
-								var matchNamespace = false;
-								if (namespaces.length > 0 && parentObj.parent_namespace != "" && parentObj.child_namespace != "") {
-									namespaces.map(function(namespace) {
-										if (namespace == parentObj.parent_namespace || namespace == parentObj.child_namespace) {
-											matchNamespace = true;
-										}
-									});
-								} else {
-									matchNamespace = true;
-								}
-								if (matchNamespace == true) {
-									var matchFilterClass = false;
-									filterClasses.map(function(filter) {
-										if (filter == parentObj.parent_class || filter == parentObj.child_class
-											|| filter == parentObj.parent_class_value || filter == parentObj.child_class_value) matchFilterClass = true;
-									});
-									if (!matchFilterClass) {
-										var alertCount = this.getAlertsCountByCI(parentObj.parent_id,"","Open,Reopen");
-										if (alertCount == 0) alertCount = -1;
-										var childRow = '["' + parentObj.parent_class + '",' + 0 + ',"' + parentObj.child_name + "||" + parentObj.child_id + '","' + parentObj.parent_name + "||" + parentObj.parent_id + '",' + alertCount + ',' + -1 + '],';
-										topologyRows += childRow;
-										nextChildIds.push(parentObj.parent_id);
-									}
-								}
-							}
+							var alertCount = this.getAlertsCountByCI(parentObj.parent_id,"","Open,Reopen");
+							if (alertCount == 0) 
+								alertCount = -1;
+							var childRow = '["' + parentObj.parent_class + '",' + 0 + ',"' + parentObj.child_name + "||" + parentObj.child_id + '","' + parentObj.parent_name + "||" + parentObj.parent_id + '",' + alertCount + ',' + -1 + '],';
+							topologyRows += childRow;
+							nextChildIds.push(parentObj.parent_id);
 						}
 					} else {
 						var cmdb_ci_gr = new GlideRecord("cmdb_ci");
@@ -929,10 +772,9 @@ GrafanaMetricData.prototype = {
 					var parentId = parentIds.pop();
 					var childGR = new GlideRecord("cmdb_rel_ci");
 					childGR.addQuery("parent.sys_id", parentId);
-					if (dependsOnFilter == "true") {
-						childGR.addEncodedQuery("type.name=Depends on::Used by");
-					}
-					childGR.addEncodedQuery(sysparam_query);
+					if (sysparam_query != "")
+						childGR.addEncodedQuery(sysparam_query);
+					
 					childGR.query();
 					if (childGR.hasNext()) {
 						while (childGR.next()) {
@@ -948,39 +790,11 @@ GrafanaMetricData.prototype = {
 							childObj.child_class = childGR.child.sys_class_name.getDisplayValue();
 							childObj.child_class_value = childGR.child.sys_class_name.toString();
 							
-							childObj.parent_namespace = "";
-							childObj.child_namespace = "";
-							try {
-								childObj.parent_namespace = childGR.parent.namespace.getDisplayValue();
-								childObj.child_namespace = childGR.child.namespace.getDisplayValue();
-							} catch (e) {}
-							//If the class is included in the list of excluded classes, then it wont be returned
-							if (!childObj.child_name.includes("Manual Endpoint") && !childObj.parent_name.includes("Manual Endpoint")) {
-								var matchNamespace = false;
-								if (namespaces.length > 0 && childObj.parent_namespace != "" && childObj.child_namespace != "") {
-									namespaces.map(function(namespace) {
-										if (namespace == childObj.parent_namespace || namespace == childObj.child_namespace) {
-											matchNamespace = true;
-										}
-									});
-								} else {
-									matchNamespace = true;
-								}
-								if (matchNamespace == true) {
-									var matchFilterClass = false;
-									filterClasses.map(function(filter) {
-										if (filter == childObj.parent_class || filter == childObj.child_class
-											|| filter == childObj.parent_class_value || filter == childObj.child_class_value) matchFilterClass = true;
-									});
-									if (!matchFilterClass) {
-										var alertCount = this.getAlertsCountByCI(childObj.child_id,"","Open,Reopen");
-										if (alertCount == 0) alertCount = -1;
-										var childRow = '["' + childObj.child_class + '",' + 0 + ',"' + childObj.parent_name + "||" + childObj.parent_id + '","' + childObj.child_name + "||" + childObj.child_id + '",' + alertCount + ',' + -1 + '],';
-										topologyRows += childRow;
-										nextParentIds.push(childObj.child_id);
-									}
-								}
-							}
+							var alertCount = this.getAlertsCountByCI(childObj.child_id,"","Open,Reopen");
+							if (alertCount == 0) alertCount = -1;
+							var childRow = '["' + childObj.child_class + '",' + 0 + ',"' + childObj.parent_name + "||" + childObj.parent_id + '","' + childObj.child_name + "||" + childObj.child_id + '",' + alertCount + ',' + -1 + '],';
+							topologyRows += childRow;
+							nextParentIds.push(childObj.child_id);
 						}
 					} else {
 						var cmdbGR = new GlideRecord("cmdb_ci");
@@ -1827,13 +1641,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>34</sys_mod_count>
+        <sys_mod_count>37</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-16 16:40:49</sys_updated_on>
+        <sys_updated_on>2021-09-17 18:09:35</sys_updated_on>
     </sys_script_include>
 </record_update>
