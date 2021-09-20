@@ -11,13 +11,22 @@
 	var ciId = "";
 	var sysparam = "";
 	var alertType = "service";
+	var limit = 9999;
+	var page = 0;
 	if (request.body.data.targets[0].target)
 		ciId = request.body.data.targets[0].target;
 	if (request.body.data.targets[0].sysparm_query)
 		sysparam = request.body.data.targets[0].sysparm_query;
 	if (request.body.data.targets[0].alertType)
 		alertType = request.body.data.targets[0].alertType;
-	
+	if (request.body.data.targets[0].limit) {
+		if (request.body.data.targets[0].limit <= 10000 && request.body.data.targets[0].limit > 0)
+			limit = request.body.data.targets[0].limit;
+	}
+	if (request.body.data.targets[0].page) {
+		if (request.body.data.targets[0].page >= 0)
+			page = request.body.data.targets[0].page;
+	}
 	//To do: add a condition if input not provided to return 500 error
 	
 	response.setContentType('application/json');
@@ -25,7 +34,7 @@
 	var writer = response.getStreamWriter();
 	
 	var metricData = new global.GrafanaMetricData();
-    var metricValues=metricData.getChanges(ciId, alertType, sysparam);
+    var metricValues=metricData.getChanges(ciId, alertType, sysparam, limit, page);
 	
 	writer.writeString(metricValues);
 })(request, response);]]></operation_script>
@@ -42,14 +51,14 @@
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 17:12:02</sys_created_on>
         <sys_id>f92e930a1b1ab8507ef18736604bcbb0</sys_id>
-        <sys_mod_count>0</sys_mod_count>
+        <sys_mod_count>1</sys_mod_count>
         <sys_name>V1-Query-Changes</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_ws_operation_f92e930a1b1ab8507ef18736604bcbb0</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-01 17:12:02</sys_updated_on>
+        <sys_updated_on>2021-09-20 15:07:09</sys_updated_on>
         <web_service_definition display_value="Grafana API">018753021b1ab8507ef18736604bcbce</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>

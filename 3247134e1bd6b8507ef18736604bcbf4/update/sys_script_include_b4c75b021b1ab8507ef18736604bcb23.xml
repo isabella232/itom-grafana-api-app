@@ -269,16 +269,18 @@ GrafanaMetricData.prototype = {
 		}
 		return JSON.stringify(returnValues);
 	},
-	getOutageStatus: function (ciIds, showPercent, sysparam) {
+	getOutageStatus: function (ciIds, showPercent, sysparam, limit, page) {
 		try {
 			var outageStatus = [];
+			var pageWindow = this.getPageWindow(limit, page);
 			var serviceGr = new GlideRecord("cmdb_ci_service_discovered");
 			if (ciIds != "")
 				serviceGr.addEncodedQuery("sys_idIN" + ciIds);
 			if (sysparam != "")
 				serviceGr.addEncodedQuery(sysparam);
 			serviceGr.orderBy("name");
-			serviceGr.setLimit(250);
+			serviceGr.setLimit(limit);
+			serviceGr.chooseWindow(pageWindow[0], pageWindow[1]);
 			serviceGr.query();
 			while (serviceGr.next()) {
 				var sys_id = serviceGr.getValue("sys_id");
@@ -317,7 +319,7 @@ GrafanaMetricData.prototype = {
 		}
 		return JSON.stringify(result);
 	},
-	queryLogData: function (sysparam, limit, sortBy, startTimeInput, endTimeInput, esSearch) {
+	queryLogData: function (sysparam, limit, page, sortBy, startTimeInput, endTimeInput, esSearch) {
 		var returnArray = [];
 		
 		var startTime = new GlideDateTime();
@@ -325,11 +327,13 @@ GrafanaMetricData.prototype = {
 		var endTime = new GlideDateTime();
 		endTime.setNumericValue(endTimeInput);
 		
+		var pageWindow = this.getPageWindow(limit, page);
 		var logGr = new GlideRecord("sn_occ_log_viewer_parent");
 		logGr.addEncodedQuery("timeBETWEEN" + startTime + "@" + endTime);
 		logGr.addEncodedQuery(sysparam);
 		if (esSearch != "") logGr.addEncodedQuery("123LUCENE_QUERY321=" + this.encodeBase16(esSearch));
 		logGr.setLimit(limit);
+		logGr.chooseWindow(pageWindow[0], pageWindow[1]);
 		logGr.orderBy(sortBy);
 		logGr.query();
 		var rowCount = logGr.getRowCount();
@@ -360,7 +364,7 @@ GrafanaMetricData.prototype = {
 		returnArray.push(obj);
 		return JSON.stringify(returnArray);
 	},
-	queryTable: function (tableName, columns, sysparam, sortBy, limit) {
+	queryTable: function (tableName, columns, sysparam, sortBy, limit, page) {
 		var returnStr = "";
 		var fields = [];
 		if (columns.indexOf("|") != -1) {
@@ -370,10 +374,11 @@ GrafanaMetricData.prototype = {
 		}
 		if (columns.length == 0)
 			fields = this.getTableColumns(tableName);
-		
+		var pageWindow = this.getPageWindow(limit, page);
 		var tableGR = new GlideRecord(tableName);
 		tableGR.addEncodedQuery(sysparam);
 		tableGR.setLimit(limit);
+		tableGR.chooseWindow(pageWindow[0], pageWindow[1]);
 		tableGR.orderBy(sortBy);
 		tableGR.query();
 		while (tableGR.next()) {
@@ -634,7 +639,7 @@ GrafanaMetricData.prototype = {
 		}
 		
 	},
-	getAlerts: function(ciId, alertType, alertState, sysparam) {
+	getAlerts: function(ciId, alertType, alertState, sysparam, limit, page, sortBy) {
 		var dataStr="";
 		var alertStateFilter="Open,Reopen";
 		if (alertState == "All")
@@ -651,7 +656,7 @@ GrafanaMetricData.prototype = {
 			cis=[""];
 		
 		for(var i=0;i<cis.length;i++) {
-			var alertsbyCI=this.getAlertsByCI(cis[i],alertStateFilter,sysparam_query);
+			var alertsbyCI=this.getAlertsByCI(cis[i],alertStateFilter,sysparam_query, limit, page, sortBy);
 			if (alertsbyCI.length > 0)
 				dataStr += alertsbyCI + ",";
 		}
@@ -660,7 +665,7 @@ GrafanaMetricData.prototype = {
 			dataStr=dataStr.substring(0, dataStr.length - 1);
 		return '['+dataStr+"]";
 	},
-	getChanges: function (ciId, alertType, sysparam) {
+	getChanges: function (ciId, alertType, sysparam, limit, page) {
 		var dataStr = "";
 		var sysparam_query="";
 		if (sysparam != "")
@@ -674,7 +679,7 @@ GrafanaMetricData.prototype = {
 			cis=[""];
 		
 		for(var i=0;i<cis.length;i++) {
-			var changesByCI=this.getChangesByCI(cis[i], sysparam_query);
+			var changesByCI=this.getChangesByCI(cis[i], sysparam_query, limit, page);
 			if (changesByCI.length > 0)
 				dataStr += changesByCI + ",";
 		}
@@ -860,7 +865,7 @@ GrafanaMetricData.prototype = {
 		
 		return "["+cisSummary+"]";
 	},
-	getACCAgents: function (filter, metricNameMatch, startTimeInput, endTimeInput, sysParamQuery, filterTypeStr) {
+	getACCAgents: function (filter, metricNameMatch, startTimeInput, endTimeInput, sysParamQuery, filterTypeStr, limit, page) {
 		var agentFilter = "";
 		if (filter != "") {
 			if (filter.indexOf("(") != -1) filter = filter.substring(filter.indexOf("(") + 1, filter.indexOf(")"));
@@ -883,6 +888,7 @@ GrafanaMetricData.prototype = {
 		var returnStr="";
 		//get ACC agents 
 		var filterArray = this.getValuesByNameMatch(agentFilter, "|");
+		var pageWindow = this.getPageWindow(limit, page);
 		var accAgentsCIs= new  GlideRecord("sn_agent_cmdb_ci_agent");
 		accAgentsCIs.addEncodedQuery(sysparam);
 		if (filterArray.length > 0) {
@@ -903,6 +909,8 @@ GrafanaMetricData.prototype = {
 				}
 			}
 		}
+		accAgentsCIs.setLimit(limit);
+		accAgentsCIs.chooseWindow(pageWindow[0], pageWindow[1]);
 		accAgentsCIs.query();
 		while (accAgentsCIs.next())
 		{
@@ -1221,6 +1229,17 @@ GrafanaMetricData.prototype = {
 	},
 	
 	// Helper Methods
+	getPageWindow: function (limit, page) {
+		var pageWindow = [];
+		if (page == 0) {
+			pageWindow.push(0);
+			pageWindow.push(limit);
+		} else {
+			pageWindow.push(limit * page);
+			pageWindow.push(limit * (page + 1));
+		}
+		return pageWindow;
+	},
 	getTableColumns: function (table) {
 		var returnArray = [];
 		var columnGr = new GlideRecord("sys_dictionary");
@@ -1420,12 +1439,15 @@ GrafanaMetricData.prototype = {
         }
         return cis;
 	},
-	getChangesByCI: function (ciId, sysparam_query) {
+	getChangesByCI: function (ciId, sysparam_query, limit, page) {
+		var pageWindow = this.getPageWindow(limit, page);
 		var changeGr = new GlideRecord('change_request');
 		if (ciId != "")
 			changeGr.addQuery("cmdb_ci", ciId);
 		if (sysparam_query != "")
 			changeGr.addEncodedQuery(sysparam_query);
+		changeGr.setLimit(limit);
+		changeGr.chooseWindow(pageWindow[0], pageWindow[1]);
 		changeGr.query();
 		var changeStr = "";
 		while (changeGr.next()) {
@@ -1451,7 +1473,7 @@ GrafanaMetricData.prototype = {
 		gs.info(changeStr);
 		return changeStr;
 	},
-	getAlertsByCI: function (ciId,filter,query) {
+	getAlertsByCI: function (ciId, filter, query, limit, page, sortBy) {
 		var queryFilter;
 		if (filter != "")
 			queryFilter=filter;
@@ -1470,6 +1492,7 @@ GrafanaMetricData.prototype = {
 				impactedServiceSysparam = impactedServiceSysparam.substring(impactedServiceSysparam.indexOf("LIKE") + 4, impactedServiceSysparam.length);
 			}
 		}
+		var pageWindow = this.getPageWindow(limit, page);
 		var alertGr = new GlideRecord('em_alert');
 		if (queryFilter) {
 			alertGr.addQuery('state','IN',queryFilter);
@@ -1481,7 +1504,9 @@ GrafanaMetricData.prototype = {
 		//alertGr.addQuery('sys_created_on','>=',gs.daysAgo(7));
 		if (ciId != "")
 			alertGr.addQuery("cmdb_ci.sys_id", ciId);
-
+		alertGr.setLimit(limit);
+		alertGr.chooseWindow(pageWindow[0], pageWindow[1]);
+		alertGr.orderBy(sortBy);
 		alertGr.query();
 		var alertsStr="";
 		var count = alertGr.getRowCount();
@@ -1641,13 +1666,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>37</sys_mod_count>
+        <sys_mod_count>45</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-17 18:09:35</sys_updated_on>
+        <sys_updated_on>2021-09-20 15:48:08</sys_updated_on>
     </sys_script_include>
 </record_update>
