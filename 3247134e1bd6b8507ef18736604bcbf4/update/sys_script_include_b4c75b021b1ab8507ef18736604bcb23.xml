@@ -1519,6 +1519,7 @@ GrafanaMetricData.prototype = {
 			alert.AlertId=alertGr.getValue("number");
 			alert.Incident=alertGr.getDisplayValue("incident");
 			alert.IncidentSysID=alertGr.getValue("incident");
+			alert.incidentPriority = parseInt(alertGr.incident.priority.toString());
 			alert.Group=alertGr.getDisplayValue("group_source");
 			alert.Severity  = alertGr.getDisplayValue("severity");
 			alert.Priortity =alertGr.getDisplayValue("sn_priority_group");
@@ -1541,6 +1542,7 @@ GrafanaMetricData.prototype = {
 			alert.last_event_time = this.convertSysCreatedStrToMS(alertGr.getValue("last_event_time"));
 			alert.sys_id=alertGr.getValue("sys_id");
 			alert.additional_info=alertGr.getValue("additional_info");
+			
 			try {
 				var additional_info_json = JSON.parse(alert.additional_info);
 				alert.anomaly_count = parseInt(additional_info_json.sn_anomaly_current);
@@ -1551,7 +1553,8 @@ GrafanaMetricData.prototype = {
 			alert.start_time = this.convertSysCreatedStrToMS(alertGr.getValue("sys_created_on"));
 			
 			alert.secondary_alerts = 0;
-			if (alert.Group != "6" && alert.Group != "5") {
+			if (alert.Group != "Secondary" && alert.Group != "") {
+				alert.drilldownSysID = alert.sys_id;
 				var secondaryGr = new GlideAggregate("em_alert");
 				secondaryGr.addQuery("parent", alert.sys_id);
 // 				if (queryFilter) 
@@ -1562,6 +1565,8 @@ GrafanaMetricData.prototype = {
 				if (secondaryGr.next()) {
 					alert.secondary_alerts = parseInt(secondaryGr.getAggregate("COUNT", "sys_id"));
 				}
+			} else {
+				alert.drilldownSysID = alertGr.getValue("parent");
 			}
 			
 			alert.impactedServicesCount = alertGr.getValue('sn_services');
@@ -1666,13 +1671,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>45</sys_mod_count>
+        <sys_mod_count>52</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-20 15:48:08</sys_updated_on>
+        <sys_updated_on>2021-09-20 19:02:25</sys_updated_on>
     </sys_script_include>
 </record_update>
