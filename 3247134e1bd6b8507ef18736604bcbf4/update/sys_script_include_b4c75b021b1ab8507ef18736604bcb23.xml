@@ -430,74 +430,74 @@ GrafanaMetricData.prototype = {
 		return JSON.stringify(returnArray);
 	},
 	getMetrics: function (ciId, startTimeInput, endTimeInput, sysparam) {
+		var metricStr = "";
 		var startTime = new GlideDateTime();
 		startTime.subtract(startTime.getNumericValue());// gets the date to 0
 		startTime.add(startTimeInput);
 		var endTime = new GlideDateTime();
 		endTime.subtract(endTime.getNumericValue());
 		endTime.add(endTimeInput);
-
-		//get table name
-		var ciTable;
-		var ciGr = new GlideRecord("cmdb_ci");
-		ciGr.addQuery("sys_id", ciId);
-		ciGr.query();
-		if (ciGr.next())
-		{
-			ciTable = ciGr.getValue("sys_class_name");
-			ciName=ciGr.getDisplayValue();
-		}
-
-		//ciTable is a table with metric fields.
-		var metricTableGr = new GlideRecord(ciTable);
-		metricTableGr.addQuery("sys_id", ciId);
-		if (sysparam != "")
-			metricTableGr.addEncodedQuery(sysparam);
-		metricTableGr.query();
-
-		var metrics = this.getAllMetricsByCi(ciId);  // TODO: get from clotho instead of metric to ci table
-		var builder;
-		var dataSet = '[ ';
-		for (var i = 0; i < metrics.length; i++) {
-			var metricName;
-			//build a transform that returns a simple average
-			builder = new sn_clotho.Transformer(metricTableGr);
-			builder.metric(metrics[i]).avg().label("Average");
-
-			//execute transform and return result for visualization
-			var result = builder.execute(startTime, endTime);
-
-			var values = result.getData().getValues();
-			var timestamp = result.getData().getStart().getNumericValue();
-			var period = result.getData().getPeriod() * 1000;
-			metricName = result.getData().getMetricName();
-
-			dataSet+='{"source":"' + ciName + '",';
-			dataSet+='"type":"' + "" + '",';
-			dataSet+='"metricName":"' + metricName + '",';
-			dataSet += ' "datapoints": [';
-			
-			for (var j = 0; j < values.length; j++) {
-				// [100,1593283865000],
-				if (values[j])
-					dataSet += '[' + values[j] + ',' + timestamp + '],';
-
-				timestamp += period;
+		var cis = this.getValuesByNameMatch(ciId, "|");
+		for(var c = 0; c < cis.length; c++) {
+			var ciTable = "";
+			var ciName = "";
+			var ciGr = new GlideRecord("cmdb_ci");
+			ciGr.addQuery("sys_id", cis[c]);
+			ciGr.query();
+			if (ciGr.next()) {
+				ciTable = ciGr.getValue("sys_class_name");
+				ciName = ciGr.getDisplayValue("name");
 			}
+			//ciTable is a table with metric fields.
+			var metricTableGr = new GlideRecord(ciTable);
+			metricTableGr.addQuery("sys_id", cis[c]);
+			if (sysparam != "")
+				metricTableGr.addEncodedQuery(sysparam);
+			metricTableGr.query();
 
+			var metrics = this.getAllMetricsByCi(cis[c]);  // TODO: get from clotho instead of metric to ci table
+			var builder;
+			var dataSet = '';
+			for (var i = 0; i < metrics.length; i++) {
+				var metricName;
+				//build a transform that returns a simple average
+				builder = new sn_clotho.Transformer(metricTableGr);
+				builder.metric(metrics[i]).avg().label("Average");
+
+				//execute transform and return result for visualization
+				var result = builder.execute(startTime, endTime);
+
+				var values = result.getData().getValues();
+				var timestamp = result.getData().getStart().getNumericValue();
+				var period = result.getData().getPeriod() * 1000;
+				metricName = result.getData().getMetricName();
+
+				dataSet+='{"source":"' + ciName + '",';
+				dataSet+='"type":"' + "" + '",';
+				dataSet+='"metricName":"' + metricName + '",';
+				dataSet += ' "datapoints": [';
+
+				for (var j = 0; j < values.length; j++) {
+					// [100,1593283865000],
+					if (values[j])
+						dataSet += '[' + values[j] + ',' + timestamp + '],';
+
+					timestamp += period;
+				}
+
+				// remove the last ','
+				if (dataSet[dataSet.length - 1] == ",")
+					dataSet = dataSet.substring(0, dataSet.length - 1);
+
+				dataSet += ']},';
+			}
 			// remove the last ','
-			if (dataSet[dataSet.length - 1] == ",")
-				dataSet = dataSet.substring(0, dataSet.length - 1);
-
-			dataSet += ']},';
+			
+			metricStr += dataSet;
 		}
-		// remove the last ','
-		if (dataSet.charAt(dataSet.length - 1) == ",") 
-			dataSet = dataSet.substring(0, dataSet.length - 1);
-
-		dataSet += ']';
-		gs.info("DataSet: " + dataSet);
-		return dataSet;
+		if (metricStr.charAt(metricStr.length - 1) == ",") 
+				metricStr = metricStr.substring(0, metricStr.length - 1);
+		return "[" + metricStr + "]";
 	},
 	getSingleMetric: function(ciIdMatch, metricIdMatch, resourceNameMatch,startTimeInput,endTimeInput,sysparam) {
 		var startTime = new GlideDateTime();
@@ -1671,13 +1671,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>52</sys_mod_count>
+        <sys_mod_count>54</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-20 19:02:25</sys_updated_on>
+        <sys_updated_on>2021-09-21 13:44:27</sys_updated_on>
     </sys_script_include>
 </record_update>
