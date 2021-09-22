@@ -134,6 +134,23 @@ GrafanaMetricData.prototype = {
 				idList.push(ciId);
 			}
 			if (type == "class") returnValues.push({ name: "None", id: ""});
+			var startGr = new GlideRecord("cmdb_ci");
+			startGr.addQuery("sys_id", idList[0]);
+			startGr.query();
+			if (startGr.next()) {
+				var obj = {};
+				obj.id = startGr.getValue("sys_id");
+				obj.name = startGr.getDisplayValue("name");
+				var id = obj.id;
+				var className = startGr.getDisplayValue("sys_class_name");
+				var classValue = startGr.getValue("sys_class_name");
+				if (type == "class") {
+					obj.id = classValue;
+					obj.name = className;
+				}
+				returnValues.push(obj);
+				returnValueIds.push(obj.id);
+			}
 			while (parentDepth > 0) {
 				var nextIdList = [];
 				while (idList.length > 0) {
@@ -1674,13 +1691,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>55</sys_mod_count>
+        <sys_mod_count>56</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-21 14:37:33</sys_updated_on>
+        <sys_updated_on>2021-09-22 20:26:23</sys_updated_on>
     </sys_script_include>
 </record_update>
