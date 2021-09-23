@@ -12,6 +12,44 @@ GrafanaMetricData.prototype = {
     initialize: function() {
     },
 	
+	getAlertAnomaly: function (columns, sysparam_query, sortBy, limit, page) {
+		var anomalyValues = [];
+		var fields = [];
+		if (columns.indexOf("|") != -1) {
+			fields = this.getValuesByNameMatch(columns, "|");
+		} else {
+			fields = this.getValuesByNameMatch(columns, ",");
+		}
+		if (columns.length == 0)
+			fields = this.getTableColumns("em_alert_anomaly");
+		
+		var pageWindow = this.getPageWindow(limit, page);
+		var anomalyGR = new GlideRecord("em_alert_anomaly");
+		anomalyGR.addEncodedQuery(sysparam_query);
+		anomalyGR.setLimit(limit);
+		anomalyGR.chooseWindow(pageWindow[0], pageWindow[1]);
+		anomalyGR.orderBy(sortBy);
+		anomalyGR.query();
+		while (anomalyGR.next()) {
+			var obj = {};
+			fields.map(function(field) {
+				obj[field] = anomalyGR.getDisplayValue(field);
+				if (field == "additional_info") {
+					var additional_info = JSON.parse(obj[field]);
+					for (var key in additional_info) {
+						obj[key] = additional_info[key];
+					}
+				}
+				
+				var description = anomalyGR.getDisplayValue("description");
+				obj["description.metricType"] = anomalyGR.getDisplayValue("type");
+				obj["description.metricValue"] = description.substring(description.indexOf("metric value") + 13, description.indexOf(" is"));
+				obj["description.boundary"] = description.substring(description.indexOf("boundary ") + 9, description.length);
+			});
+			anomalyValues.push(obj);
+		}
+		return JSON.stringify(anomalyValues);
+	},
 	getAllTableColumns: function (table, search) {
 		// doubleDepthSearch is an experimental feature. Currently it's not supported by Grafana's select component
 		var doubleDepthSearch = false;
@@ -415,13 +453,12 @@ GrafanaMetricData.prototype = {
 					obj["subscriptions"] = obj[field].substring(obj[field].indexOf("/", obj[field].indexOf("subscriptions")) + 1, obj[field].indexOf("/", obj[field].indexOf("subscriptions") + 14));
 					obj["resourceGroups"] = obj[field].substring(obj[field].indexOf("/", obj[field].indexOf("resourceGroups")) + 1, obj[field].indexOf("/", obj[field].indexOf("resourceGroups") + 15));
 				}
-// 				var numberTest = obj[field].replace(",","");
-// 				if (isNaN(parseInt(numberTest)) == false && isFinite(numberTest)) {
-// 					obj[field] = parseInt(numberTest);
-// 				}
-// 				if (isNaN(Date.parse(obj[field])) == false) {
-// 					obj[field] = Date.parse(obj[field]);
-// 				}
+				if (field == "additional_info") {
+					var additional_info = JSON.parse(obj[field]);
+					for (var key in additional_info) {
+						obj[key] = additional_info[key];
+					}
+				}
 			});
 			var jsonObj = JSON.stringify(obj);
 			returnStr += jsonObj + ",";
@@ -1691,13 +1728,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>56</sys_mod_count>
+        <sys_mod_count>65</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-22 20:26:23</sys_updated_on>
+        <sys_updated_on>2021-09-22 23:02:58</sys_updated_on>
     </sys_script_include>
 </record_update>
