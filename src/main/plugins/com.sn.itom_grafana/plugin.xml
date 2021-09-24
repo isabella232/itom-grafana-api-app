@@ -1,0 +1,11 @@
+<plugin
+	id="${plugin.dir}"
+	version="${plugin.version}"
+	name="${plugin.name}"
+	licensable="${plugin.licensable}"
+	scope_name="${plugin.scope_name}"
+	scope_sys_id="${plugin.scope_sys_id}"
+	provider_name="ServiceNow"
+	state="development">
+	<description>ITOM Grafana Plugin</description>
+</plugin>
