@@ -19,7 +19,7 @@
 	response.setContentType('application/json');
     response.setStatus(200);
 	var writer = response.getStreamWriter();
-	var metricData = new global.GrafanaMetricData();
+	var metricData = new sn_itom_grafana.GrafanaMetricData();
 	
 	var tableResponse=metricData.getQueryRowCount(tableName, sysparam);
 	writer.writeString(tableResponse);

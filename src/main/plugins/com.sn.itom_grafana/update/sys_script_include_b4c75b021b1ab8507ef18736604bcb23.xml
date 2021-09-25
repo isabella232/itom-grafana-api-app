@@ -2,7 +2,7 @@
     <sys_script_include action="INSERT_OR_UPDATE">
         <access>package_private</access>
         <active>true</active>
-        <api_name>global.GrafanaMetricData</api_name>
+        <api_name>sn_itom_grafana.GrafanaMetricData</api_name>
         <caller_access/>
         <client_callable>false</client_callable>
         <description/>
@@ -631,7 +631,7 @@ GrafanaMetricData.prototype = {
 			if(gr.get("name",resourceNameMatch))
 				resourceId=gr.getValue("sys_id");
 
-			var anomalyMetricData = new global.AnomalyMetricData();
+			var anomalyMetricData = new sn_itom_grafana.AnomalyMetricData();
 			metricDataStr=anomalyMetricData.getMetricData(ciId,startTime,endTime,metricId,resourceId);
 			return metricDataStr;
 		} catch (e) {
@@ -1570,7 +1570,7 @@ GrafanaMetricData.prototype = {
 			}
 			
 			alert.impactedServicesCount = alertGr.getValue('sn_services');
-			var alertsInGroup = new global.EvtMgmtAlertsInGroupAPI();
+			var alertsInGroup = new sn_itom_grafana.EvtMgmtAlertsInGroupAPI();
 			var allImpactedServices = alertsInGroup.getImpactedServicesForAlert(alert.sys_id);
 			alert.impactedServiceSysIDs = "";
 			alert.impactedServices = "";

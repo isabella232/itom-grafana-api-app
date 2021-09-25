@@ -15,7 +15,7 @@
 	if (request.body.data.targets[0].search)
 		search = request.body.data.targets[0].search;
 	
-    var metricData = new global.GrafanaMetricData();
+    var metricData = new sn_itom_grafana.GrafanaMetricData();
 	var columns = metricData.getAllTableColumns(table, search);
 	
 	response.setContentType('application/json');

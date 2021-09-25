@@ -38,7 +38,7 @@
 	response.setStatus(200);
 	
 	var writer = response.getStreamWriter();
-	var metricData = new global.GrafanaMetricData();
+	var metricData = new sn_itom_grafana.GrafanaMetricData();
 	
 	var tableResponse=metricData.queryLogData(sysparam_query, limit, page, sortBy, startTime, endTime, esSearch);
 	writer.writeString(tableResponse);

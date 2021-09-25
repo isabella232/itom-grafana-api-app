@@ -24,7 +24,7 @@
 	if (request.body.data.targets[0].type)
 		type = request.body.data.targets[0].type;
 	
-	var metricData = new global.GrafanaMetricData();
+	var metricData = new sn_itom_grafana.GrafanaMetricData();
 	var nested_cis = metricData.getNestedCIS(ciId, parentDepth, childDepth, sysparam, type);
 	
 	response.setContentType('application/json');

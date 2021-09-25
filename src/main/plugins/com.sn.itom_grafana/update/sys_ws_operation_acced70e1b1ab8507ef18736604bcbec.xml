@@ -25,7 +25,7 @@
 	response.setStatus(200);
 	
 	var writer = response.getStreamWriter();
-	var metricData = new global.GrafanaMetricData();
+	var metricData = new sn_itom_grafana.GrafanaMetricData();
 	
 	var outages=metricData.getOutageStatus(ciIds, showPercent, sysparam, limit, page);
 	writer.writeString(outages);

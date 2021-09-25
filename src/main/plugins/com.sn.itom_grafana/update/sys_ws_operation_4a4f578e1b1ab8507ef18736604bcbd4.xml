@@ -26,7 +26,7 @@
 	response.setContentType('application/json');
     
 	
-	var metricData = new global.GrafanaMetricData();
+	var metricData = new sn_itom_grafana.GrafanaMetricData();
     var metricValues=metricData.getTopology(rootName, childDepth, parentDepth, sysparam_query);
 	if (metricValues != "") {
 		response.setStatus(200);

@@ -30,7 +30,7 @@
     response.setStatus(200);
 	var writer = response.getStreamWriter();
 	
-	var metricData = new global.GrafanaMetricData();
+	var metricData = new sn_itom_grafana.GrafanaMetricData();
 
     var metricValues=metricData.getAnomalyMetrics(ciId,metricId,resourceName,startTimeInput,endTimeInput, sysparam);
 	writer.writeString(metricValues);
