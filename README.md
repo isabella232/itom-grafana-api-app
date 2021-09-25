@@ -6,3 +6,6 @@ To build this as a scoped app with scope `sn_itom_grafana` switch to the [maven 
 `.zip` file in the `target` folder. The `.zip` file can be installed using the `Install File` feature in `maint` mode as shown below.
 ![](docs/images/from-file.png)
 ![](docs/images/select-app-zip.png) 
+
+The installed app will look like this:
+![](docs/images/installed-app.png)
