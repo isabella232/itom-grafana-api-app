@@ -1,5 +1,5 @@
 # REST API for ITOM Grafana Plugin
-This repostory contains REST APIs used by the [ServiceNow ITOM Grafana Data Source Plugin](https://grafana.com/blog/2020/02/03/introducing-the-new-servicenow-plugin-for-grafana/).
+This repostory contains REST APIs used by the [ServiceNow ITOM Grafana Plugin](https://github.com/ServiceNow/itom-grafana-plugin)
 The APIs can be installed directly from this source repo to global scope by pointing to the master branch of this repo.
 Open API (swagger) docs are [here](http://ec2-34-230-5-99.compute-1.amazonaws.com/).
 
