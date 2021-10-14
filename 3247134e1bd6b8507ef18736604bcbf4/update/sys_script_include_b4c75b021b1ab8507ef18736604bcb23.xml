@@ -12,6 +12,31 @@ GrafanaMetricData.prototype = {
     initialize: function() {
     },
 	
+	queryUIActions: function (table, sysparam, sortBy, limit, page) {
+		var returnActions = [];
+		var pageWindow = this.getPageWindow(limit, page);
+		var actionGr = new GlideRecord('sys_ui_action');
+		if (table != "") {
+			actionGr.addQuery('table', table);
+		}
+		if (sysparam != "") {
+			actionGr.addEncodedQuery(sysparam);
+		} else {
+			actionGr.addQuery('active', 'true');
+			actionGr.addQuery('client', 'false');
+		}
+		actionGr.orderBy(sortBy);
+		actionGr.setLimit(limit);
+		actionGr.chooseWindow(pageWindow[0], pageWindow[1]);
+		actionGr.query();
+		while (actionGr.next()) {
+			var action = {};
+			action.name = actionGr.getDisplayValue('name');
+			action.sys_id = actionGr.getValue('sys_id');
+			returnActions.push(action);
+		}
+		return JSON.stringify(returnActions);
+	},
 	getAlertAnomaly: function (columns, sysparam_query, sortBy, limit, page) {
 		var anomalyValues = [];
 		var fields = [];
@@ -162,6 +187,7 @@ GrafanaMetricData.prototype = {
 		return JSON.stringify(returnMetrics);
 	},
 	getNestedCIS: function(ciId, parentDepth, childDepth, sysparam, type) {
+		var excludedClasses = 'dscy_route_next_hop,cmdb_ci_memory_module,cmdb_ci_disk,cmdb_ci_disk_partition,cmdb_ci_config_file_tracked,	cmdb_ci_ip_address,dscy_router_interface,cmdb_ci_network_adapter,dscy_route_interface';
 		try {
 			var returnValues = [];
 			var returnValueIds = [];
@@ -197,7 +223,8 @@ GrafanaMetricData.prototype = {
 					parentGR.addQuery("child.sys_id", currentId);
 					if (sysparam != "")
 						parentGR.addEncodedQuery(sysparam);
-					
+					parentGR.addQuery("child.sys_class_name", "NOT IN", excludedClasses);
+					parentGR.addQuery("parent.sys_class_name", "NOT IN", excludedClasses);
 					parentGR.query();
 					while (parentGR.next()) {
 						var parentObj = {};
@@ -246,7 +273,8 @@ GrafanaMetricData.prototype = {
 					childGR.addQuery("parent.sys_id", currentId);
 					if (sysparam != "")
 						childGR.addEncodedQuery(sysparam);
-					
+					childGR.addQuery("child.sys_class_name", "NOT IN", excludedClasses);
+					childGR.addQuery("parent.sys_class_name", "NOT IN", excludedClasses);
 					childGR.query();
 					while (childGR.next()) {
 						var parentObj = {};
@@ -745,6 +773,7 @@ GrafanaMetricData.prototype = {
 		return "[" + dataStr + "]";
 	},
 	getTopology: function (serviceId, childDepth, parentDepth, sysparam_query) {
+		var excludedClasses = 'dscy_route_next_hop,cmdb_ci_memory_module,cmdb_ci_disk,cmdb_ci_disk_partition,cmdb_ci_config_file_tracked,	cmdb_ci_ip_address,dscy_router_interface,cmdb_ci_network_adapter,dscy_route_interface';
 		var topologyRows='{"rows": [';
 		var childDepthLimit = 3;
 		var parentDepthLimit = 0;
@@ -782,7 +811,8 @@ GrafanaMetricData.prototype = {
 					parentGR.addQuery("child.sys_id", childId);
 					if (sysparam_query != "")
 						parentGR.addEncodedQuery(sysparam_query);
-					
+					parentGR.addQuery("child.sys_class_name", "NOT IN", excludedClasses);
+					parentGR.addQuery("parent.sys_class_name", "NOT IN", excludedClasses);
 					parentGR.query();
 					if (parentGR.hasNext()) {
 						while (parentGR.next()) {
@@ -809,6 +839,7 @@ GrafanaMetricData.prototype = {
 						var cmdb_ci_gr = new GlideRecord("cmdb_ci");
 						cmdb_ci_gr.addQuery("sys_id", childId);
 						cmdb_ci_gr.addEncodedQuery(sysparam_query);
+						cmdb_ci_gr.addQuery("sys_class_name", "NOT IN", excludedClasses);
 						cmdb_ci_gr.query();
 						if (cmdb_ci_gr.next()) {
 							var childName = cmdb_ci_gr.getDisplayValue("name");
@@ -836,7 +867,8 @@ GrafanaMetricData.prototype = {
 					childGR.addQuery("parent.sys_id", parentId);
 					if (sysparam_query != "")
 						childGR.addEncodedQuery(sysparam_query);
-					
+					childGR.addQuery("child.sys_class_name", "NOT IN", excludedClasses);
+					childGR.addQuery("parent.sys_class_name", "NOT IN", excludedClasses);
 					childGR.query();
 					if (childGR.hasNext()) {
 						while (childGR.next()) {
@@ -862,6 +894,7 @@ GrafanaMetricData.prototype = {
 						var cmdbGR = new GlideRecord("cmdb_ci");
 						cmdbGR.addQuery("sys_id", parentId);
 						cmdbGR.addEncodedQuery(sysparam_query);
+						cmdbGR.addQuery("sys_class_name", "NOT IN", excludedClasses);
 						cmdbGR.query();
 						if (cmdbGR.next()) {
 							var parentName = cmdbGR.getDisplayValue("name");
@@ -1599,6 +1632,7 @@ GrafanaMetricData.prototype = {
 			alert.last_event_time = this.convertSysCreatedStrToMS(alertGr.getValue("last_event_time"));
 			alert.sys_id=alertGr.getValue("sys_id");
 			alert.additional_info=alertGr.getValue("additional_info");
+			alert.uiAction = "UI Actions";
 			
 			try {
 				var additional_info_json = JSON.parse(alert.additional_info);
@@ -1728,13 +1762,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>65</sys_mod_count>
+        <sys_mod_count>69</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-22 23:02:58</sys_updated_on>
+        <sys_updated_on>2021-10-14 23:00:38</sys_updated_on>
     </sys_script_include>
 </record_update>
