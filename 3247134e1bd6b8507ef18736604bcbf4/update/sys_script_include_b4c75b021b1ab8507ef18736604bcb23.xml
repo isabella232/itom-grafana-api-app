@@ -448,7 +448,7 @@ GrafanaMetricData.prototype = {
 		return JSON.stringify(returnArray);
 	},
 	queryTable: function (tableName, columns, sysparam, sortBy, limit, page) {
-		var returnStr = "";
+		var returnArray = [];
 		var fields = [];
 		if (columns.indexOf("|") != -1) {
 			fields = this.getValuesByNameMatch(columns, "|");
@@ -488,13 +488,10 @@ GrafanaMetricData.prototype = {
 					}
 				}
 			});
-			var jsonObj = JSON.stringify(obj);
-			returnStr += jsonObj + ",";
-			
+			returnArray.push(obj);
 		}
-		returnStr = returnStr.substring(0, returnStr.length - 1);
 		
-		return '[' + returnStr + ']';
+		return JSON.stringify(returnArray);
 	},
 	getAggregate: function(table, sysparam, type, column, groupBy) {
 		var returnArray = [];
@@ -1762,13 +1759,13 @@ GrafanaMetricData.prototype = {
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 16:44:18</sys_created_on>
         <sys_id>b4c75b021b1ab8507ef18736604bcb23</sys_id>
-        <sys_mod_count>69</sys_mod_count>
+        <sys_mod_count>70</sys_mod_count>
         <sys_name>GrafanaMetricData</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_script_include_b4c75b021b1ab8507ef18736604bcb23</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-10-14 23:00:38</sys_updated_on>
+        <sys_updated_on>2021-10-15 14:06:21</sys_updated_on>
     </sys_script_include>
 </record_update>
