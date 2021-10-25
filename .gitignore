@@ -9,6 +9,7 @@ target
 .repository
 .sass-cache
 .settings
+.project
 
 *.iml
 */.settings/org.eclipse.m2e.core.prefs

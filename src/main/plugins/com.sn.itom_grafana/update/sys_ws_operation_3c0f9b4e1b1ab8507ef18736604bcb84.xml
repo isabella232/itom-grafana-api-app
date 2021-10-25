@@ -32,7 +32,8 @@
 	
 	var metricData = new sn_itom_grafana.GrafanaMetricData();
 
-    var metricValues=metricData.getSingleMetric(ciId, metricId, resourceName, startTimeInput, endTimeInput, sysparam);
+    // if queryParams.ls is passed this API will query Lightatep for metrics
+    var metricValues=metricData.getSingleMetric(ciId, metricId, resourceName, startTimeInput, endTimeInput, sysparam,queryParams.ls);
 	writer.writeString(metricValues);
 	
 })(request, response);]]></operation_script>
