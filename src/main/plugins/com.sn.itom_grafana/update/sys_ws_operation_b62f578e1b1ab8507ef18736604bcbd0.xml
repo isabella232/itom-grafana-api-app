@@ -14,6 +14,7 @@
 	var limit = 9999;
 	var page = 0;
 	var sortBy = "";
+	var getAlertCount = false;
 	if (request.body.data.targets[0].target)
 		tableName = request.body.data.targets[0].target;
 	if (request.body.data.targets[0].columns)
@@ -30,6 +31,8 @@
 	}
 	if (request.body.data.targets[0].sortBy)
 		sortBy = request.body.data.targets[0].sortBy;
+	if (request.body.data.targets[0].getAlertCount)
+		getAlertCount = request.body.data.targets[0].getAlertCount;
     
 	response.setContentType('application/json');
 	response.setStatus(200);
@@ -37,7 +40,7 @@
 	var writer = response.getStreamWriter();
 	var metricData = new sn_itom_grafana.GrafanaMetricData();
 	
-	var tableResponse=metricData.queryTable(tableName, columns, sysparam_query, sortBy, limit, page);
+	var tableResponse=metricData.queryTable(tableName, columns, sysparam_query, sortBy, limit, page, getAlertCount);
 	writer.writeString(tableResponse);
 
 })(request, response);]]></operation_script>
@@ -54,14 +57,14 @@
         <sys_created_by>optimiz</sys_created_by>
         <sys_created_on>2021-09-01 17:16:24</sys_created_on>
         <sys_id>b62f578e1b1ab8507ef18736604bcbd0</sys_id>
-        <sys_mod_count>1</sys_mod_count>
+        <sys_mod_count>2</sys_mod_count>
         <sys_name>V1-Query-Table</sys_name>
         <sys_package display_value="Grafana Plugin" source="3247134e1bd6b8507ef18736604bcbf4">3247134e1bd6b8507ef18736604bcbf4</sys_package>
         <sys_policy/>
         <sys_scope display_value="Grafana Plugin">3247134e1bd6b8507ef18736604bcbf4</sys_scope>
         <sys_update_name>sys_ws_operation_b62f578e1b1ab8507ef18736604bcbd0</sys_update_name>
         <sys_updated_by>optimiz</sys_updated_by>
-        <sys_updated_on>2021-09-20 14:10:28</sys_updated_on>
+        <sys_updated_on>2021-10-19 18:20:54</sys_updated_on>
         <web_service_definition display_value="Grafana API">018753021b1ab8507ef18736604bcbce</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>
