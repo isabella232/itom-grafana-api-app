@@ -556,10 +556,10 @@ GrafanaMetricData.prototype = {
 
                     // not all metrics have data in clotho. In that case we want to continue with other metrics 
                     // and not crash
-            	    if (!result || !result.getData()) {
-					    gs.warn("No metric transform data for: " + metrics[i]);
-		                continue;
-				  	}
+                    if (!result || !result.getData()) {
+                        gs.warn("No metric transform data for: " + metrics[i]);
+                        continue;
+                    }
 
 					var values = result.getData().getValues();
 					var timestamp = result.getData().getStart().getNumericValue();
