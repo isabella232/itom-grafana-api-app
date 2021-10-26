@@ -554,6 +554,13 @@ GrafanaMetricData.prototype = {
 					//execute transform and return result for visualization
 					var result = builder.execute(startTime, endTime);
 
+                    // not all metrics have data in clotho. In that case we want to continue with other metrics 
+                    // and not crash
+            	    if (!result || !result.getData()) {
+					    gs.warn("No metric transform data for: " + metrics[i]);
+		                continue;
+				  	}
+
 					var values = result.getData().getValues();
 					var timestamp = result.getData().getStart().getNumericValue();
 					var period = result.getData().getPeriod() * 1000;
