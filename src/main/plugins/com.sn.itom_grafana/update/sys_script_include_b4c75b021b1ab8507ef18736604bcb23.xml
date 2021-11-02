@@ -9,13 +9,13 @@
         <name>GrafanaMetricData</name>
         <script><![CDATA[var GrafanaMetricData = Class.create();
 GrafanaMetricData.prototype = {
-    initialize: function() {
+	initialize: function () {
 		this.lsAPIKey = gs.getProperty('sn_itom_grafana.ls_api_key');
 		this.lsOrg = gs.getProperty('sn_itom_grafana.ls_org');
 		this.lsProject = gs.getProperty('sn_itom_grafana.ls_project');
 		this.lsURL = 'https://api.lightstep.com/public/v0.2/' + this.lsOrg + '/projects/' + this.lsProject;
 
-    },
+	},
 	getMetrics: function (ciId, startTimeInput, endTimeInput, sysparam, useLightStep) {
 		if (useLightStep) {
 			return this.getMetricsLS(ciId, startTimeInput, endTimeInput, sysparam, 60);
@@ -23,22 +23,21 @@ GrafanaMetricData.prototype = {
 			return this.getMetricsClotho(ciId, startTimeInput, endTimeInput, sysparam);
 		}
 	},
-	
-	getSingleMetric : function(ciId, metricId, resourceNameMatch,startTimeInput, endTimeInput, sysparam, useLightStep) {
-		//return this.getSingleMetricLS(ciId, metricId, resourceNameMatch,startTimeInput, endTimeInput, sysparam, 60);
+
+	getSingleMetric: function (ciId, metricIdMatch, resourceNameMatch, startTimeInput, endTimeInput, sysparam, useLightStep) {
 		if (useLightStep) {
-			return this.getSingleMetricLS(ciId, metricId, resourceNameMatch,startTimeInput, endTimeInput, sysparam, 60);
+			return this.getSingleMetricLS(ciId, metricIdMatch, resourceNameMatch, startTimeInput, endTimeInput, sysparam, 60);
 		} else {
-			return this.getSingleMetricClotho(ciId, metricId, resourceNameMatch,startTimeInput, endTimeInput, sysparam);
+			return this.getSingleMetricClotho(ciId, metricIdMatch, resourceNameMatch, startTimeInput, endTimeInput, sysparam);
 		}
 	},
-	testLightstepAPI : function() {
+	testLightstepAPI: function () {
 
 		var request = new sn_ws.RESTMessageV2();
 		request.setEndpoint(this.lsURL + '/telemetry/telemetry_suggestions');
 		request.setHttpMethod('GET');
-		request.setRequestHeader("Accept","application/json");
-		request.setRequestHeader("Authorization","Bearer " + this.lsAPIKey);
+		request.setRequestHeader("Accept", "application/json");
+		request.setRequestHeader("Authorization", "Bearer " + this.lsAPIKey);
 		var response = request.execute();
 
 	},
@@ -49,12 +48,12 @@ GrafanaMetricData.prototype = {
 		var itomGrafana = new sn_itom_grafana.GrafanaMetricData();
 		gs.info(itomGrafana.getMetricsLS("980a31d0db452010b7b2d984da961915", 1635035402000, 1635039002000,"",60));
 
-	*/	
-	getMetricsLS: function (ciId, startTimeInput, endTimeInput, sysparam, period) {
+	*/
+	getMetricsLS: function (ciIdMatch, startTimeInput, endTimeInput, sysparam, period) {
 		var metricStr = "";
-		var cis = this.getValuesByNameMatch(ciId, "|");
+		var cis = this.getValuesByNameMatch(ciIdMatch, "|");
 		for (var c = 0; c < cis.length; c++) {
-			var ciTable = "";
+			var ciId = cis[c];
 			var ciName = "";
 			var ciGr = new GlideRecord("cmdb_ci");
 			ciGr.addQuery("sys_id", cis[c]);
@@ -62,38 +61,38 @@ GrafanaMetricData.prototype = {
 			if (ciGr.next()) {
 				ciTable = ciGr.getValue("sys_class_name");
 				ciName = ciGr.getDisplayValue("name");
-			}
-
-			var metrics = this.getMetricNamesForCI(ciId);
-			for (var i = 0; i < metrics.length; i++) {
-				var metricName = metrics[i];
-				if (metricName.startsWith("lightstep")) {
-					gs.info("Skipping metrics:" + metricName);
-					continue;
+				// here we get metrics names for this CI from Lightstep
+				var metrics = this.getMetricNamesForCI(ciId);
+				for (var i = 0; i < metrics.length; i++) {
+					var metricName = metrics[i];
+					if (metricName.startsWith("lightstep")) {
+						gs.info("Skipping metrics:" + metricName);
+						continue;
+					}
+					// TODO: we are losing sysparam here
+					gs.info("Loading metrics for metric: " + metrics[i] + " for CI  with ciId=" + ciId + " ciName=" + ciName);
+					metricStr += this.getSingleMetricFromLSWithName(ciId, ciName, metricName, startTimeInput, endTimeInput, period);
+					metricStr += ",";
 				}
-				// TODO: we are losing sysparam here
-				gs.info("Loading metrics for metric: " + metrics[i] + " for CI  with ciId=" + ciId + " ciName=" + ciName);
-				metricStr += this.getSingleMetricFromLSWithName(ciId, ciName, metricName, startTimeInput, endTimeInput, period);
-				metricDataStr+=",";
 			}
 		}
 		if (metricStr.charAt(metricStr.length - 1) == ",")
 			metricStr = metricStr.substring(0, metricStr.length - 1);
 		return "[" + metricStr + "]";
 	},
-	
+
 	/*
 		var itomGrafana = new sn_itom_grafana.GrafanaMetricData();
 		gs.info(itomGrafana.getMetricNamesForCI("980a31d0db452010b7b2d984da961915"));
 	*/
-	getMetricNamesForCI : function(ciId) {
+	getMetricNamesForCI: function (ciId) {
 		var lsBody = '{ "data" : {"attributes" : {"label-expression": "ci_id == ' + ciId + '", "metric-regex": ".*"}}}';
 		var request = new sn_ws.RESTMessageV2();
 		request.setEndpoint(this.lsURL + '/telemetry/telemetry_suggestions');
 		request.setHttpMethod('GET');
-		request.setRequestHeader("Accept","application/json");
-		request.setRequestHeader("Content-Type","application/json");
-		request.setRequestHeader("Authorization","Bearer " + this.lsAPIKey);
+		request.setRequestHeader("Accept", "application/json");
+		request.setRequestHeader("Content-Type", "application/json");
+		request.setRequestHeader("Authorization", "Bearer " + this.lsAPIKey);
 		request.setRequestBody(lsBody);
 		var response = request.execute();
 		var respBody = JSON.parse(response.getBody());
@@ -101,28 +100,53 @@ GrafanaMetricData.prototype = {
 		return metricNames;
 
 	},
-	
+
 	/*
 
 		This is the Lightstep version of getSingleMetricClotho 
 		Sample usage:
 		var itomGrafana = new sn_itom_grafana.GrafanaMetricData();
 	gs.info(itomGrafana.getSingleMetricFromLSWithId("980a31d0db452010b7b2d984da961915","ae98f3d1dbbf0010b7c4ac4e13961951","*",1633932688000, 1633933108000,"",60));
-	*/	
-	getSingleMetricLS : function(ciId, metricId, resourceNameMatch,startTimeInput, endTimeInput, sysparam, period) {
+	*/
+	getSingleMetricLS: function (ciIdMatch, metricIdMatch, resourceNameMatch, startTimeInput, endTimeInput, sysparam, period) {
 
-		// TODO: need to deal with resourceNameMatch and sysparam and the context of Lightstep
-		var metricToCiGr = new GlideRecord('sa_metric_map');
-		var strQuery='metric_type_id.sys_id='+metricId+'^cmdb_ci.sys_id='+ciId;
-		metricToCiGr.addEncodedQuery(strQuery);
-		metricToCiGr.query();
-		metricToCiGr.next();
+		var metricStr = "";
+		var cis = this.getValuesByNameMatch(ciIdMatch, "|");
+		for (var c = 0; c < cis.length; c++) {
+			var ciId = cis[c];
+			var ciName = "";
+			var ciGr = new GlideRecord("cmdb_ci");
+			ciGr.addQuery("sys_id", ciId);
+			ciGr.query();
+			if (ciGr.next()) {
+				ciTable = ciGr.getValue("sys_class_name");
+				ciName = ciGr.getDisplayValue("name");
 
-		var ciName =   metricToCiGr.getDisplayValue("cmdb_ci");
-		var metricName	= metricToCiGr.getDisplayValue("metric_type_id");
-		return this.getSingleMetricFromLSWithName(ciId, ciName, metricName, startTimeInput, endTimeInput, period);
+				// TODO: need to deal with resourceNameMatch and sysparam and the context of Lightstep
+				// metrics were already supplied
+				var metrics = this.getValuesByNameMatch(metricIdMatch, "|");
+				for (var i = 0; i < metrics.length; i++) {
+					var metricId = metrics[i];
+					var metricToCiGr = new GlideRecord('sa_metric_map');
+					var strQuery = 'metric_type_id.sys_id=' + metricId + '^cmdb_ci.sys_id=' + ciId;
+					metricToCiGr.addEncodedQuery(strQuery);
+					metricToCiGr.query();
+					if (metricToCiGr.next()) {
+						var metricName = metricToCiGr.getDisplayValue("metric_type_id");
+						// TODO: we are losing resourceNameMatch and sysparam here
+						gs.info("Loading metrics for metric: " + metricId + " for CI  with ciId=" + ciId + " ciName=" + ciName);
+						metricStr += this.getSingleMetricFromLSWithName(ciId, ciName, metricName, startTimeInput, endTimeInput, period);
+						metricStr += ",";
+					}
+				}
+			}
+		}
+
+		if (metricStr.charAt(metricStr.length - 1) == ",")
+			metricStr = metricStr.substring(0, metricStr.length - 1);
+		return "[" + metricStr + "]";
 	},
-	getSingleMetricFromLSWithName : function(ciId, ciName, metricName, startTimeInput, endTimeInput, period) {
+	getSingleMetricFromLSWithName: function (ciId, ciName, metricName, startTimeInput, endTimeInput, period) {
 
 		var lsBody = JSON.parse('{ "data" : {"attributes" : {"input-language": "tql"}}}');
 
@@ -138,52 +162,48 @@ GrafanaMetricData.prototype = {
 		}
 
 		lsBody.data.attributes["output-period"] = period;
-		var tql = 'metric ' + metricName + ' | reduce 1m, mean | filter ci_id = "'+ciId+'"';
+		var tql = 'metric ' + metricName + ' | reduce 1m, mean | filter ci_id = "' + ciId + '"';
 		lsBody.data.attributes["query"] = tql;
 		gs.info(JSON.stringify(lsBody));
 		var dataPoints = this.queryLightstep(lsBody);
 
-		var dataSet='{"source":"' + ciName + '",';
-		dataSet+='"type":"",';
+		var dataSet = '{"source":"' + ciName + '",';
+		dataSet += '"type":"",';
 		//dataSet+='"type":"' + resourceName + '",';
-		dataSet+='"metricName":"' + metricName + '",';
-		dataSet+= dataPoints;
+		dataSet += '"metricName":"' + metricName + '",';
+		dataSet += dataPoints;
 		dataSet += '}';
-		
-		return "[" + dataSet + "]";
-
+		return dataSet;
 	},
-	queryLightstep: function(body) {
+	queryLightstep: function (body) {
 
 		var request = new sn_ws.RESTMessageV2();
 		request.setEndpoint(this.lsURL + '/telemetry/query_timeseries');
 		request.setHttpMethod('POST');
-		request.setRequestHeader("Content-Type","application/json");
-		request.setRequestHeader("Accept","application/json");
-		request.setRequestHeader("Authorization","Bearer " + this.lsAPIKey);
+		request.setRequestHeader("Content-Type", "application/json");
+		request.setRequestHeader("Accept", "application/json");
+		request.setRequestHeader("Authorization", "Bearer " + this.lsAPIKey);
 		request.setRequestBody(JSON.stringify(body));
 		var response = request.execute();
 		var bodyString = response.getBody();
 		var respBody = JSON.parse(bodyString);
 
-		var series = respBody.data.attributes.series;
+		var dataPoints = ' "datapoints": [';
+		if (!respBody || !respBody.data || !respBody.data.attributes || !respBody.data.attributes.series) {
+			gs.error(" missing data for " + JSON.stringify(body));
+		} else {
+			var series = respBody.data.attributes.series;
+			var points = series[0].points;
+			for (var j = 0; j < points.length; j++) {
+				// [1593283865000,100],
+				if (points[j])
+					dataPoints += '[' + points[j][1] + ',' + points[j][0] + '],';
+			}
 
-
-		var points = series[0].points;
-
-
-
-		var dataPoints =  ' "datapoints": [';
-
-        for (var j = 0; j < points.length; j++) {
-            // [1593283865000,100],
-            if (points[j])
-                dataPoints += '[' + points[j][1] + ',' + points[j][0] + '],';
-        }
-
-        // remove the last ','
-        if (dataPoints.charAt(dataPoints.length - 1) == ',')
-            dataPoints = dataPoints.substring(0, dataPoints.length - 1);
+			// remove the last ','
+			if (dataPoints.charAt(dataPoints.length - 1) == ',')
+				dataPoints = dataPoints.substring(0, dataPoints.length - 1);
+		}
 
 		dataPoints += ']';
 
@@ -191,15 +211,15 @@ GrafanaMetricData.prototype = {
 
 		//gs.info(dataPoints);
 	},
-	getRFC3339Timestamp : function(inputTime)  {
+	getRFC3339Timestamp: function (inputTime) {
 		var time = new GlideDateTime();
-		time.subtract(time.getNumericValue());// gets the date to 0
+		time.subtract(time.getNumericValue()); // gets the date to 0
 		time.add(inputTime);
 		var sTime = time.getDate() + "T" + time.getTime().getByFormat('HH:mm:ss') + "Z";
 		return sTime;
 	},
-	
-	
+
+
 	queryUIActions: function (table, sysparam, sortBy, limit, page) {
 		var returnActions = [];
 		var pageWindow = this.getPageWindow(limit, page);
@@ -235,7 +255,7 @@ GrafanaMetricData.prototype = {
 		}
 		if (columns.length == 0)
 			fields = this.getTableColumns("em_alert_anomaly");
-		
+
 		var pageWindow = this.getPageWindow(limit, page);
 		var anomalyGR = new GlideRecord("em_alert_anomaly");
 		anomalyGR.addEncodedQuery(sysparam_query);
@@ -245,7 +265,7 @@ GrafanaMetricData.prototype = {
 		anomalyGR.query();
 		while (anomalyGR.next()) {
 			var obj = {};
-			fields.map(function(field) {
+			fields.map(function (field) {
 				obj[field] = anomalyGR.getDisplayValue(field);
 				if (field == "additional_info") {
 					var additional_info = JSON.parse(obj[field]);
@@ -253,7 +273,7 @@ GrafanaMetricData.prototype = {
 						obj[key] = additional_info[key];
 					}
 				}
-				
+
 				var description = anomalyGR.getDisplayValue("description");
 				obj["description.metricType"] = anomalyGR.getDisplayValue("type");
 				obj["description.metricValue"] = description.substring(description.indexOf("metric value") + 13, description.indexOf(" is"));
@@ -272,7 +292,7 @@ GrafanaMetricData.prototype = {
 		columnGr.addEncodedQuery("element!=NULL");
 		columnGr.addEncodedQuery("column_labelLIKE" + search);
 		columnGr.query();
-		while(columnGr.next()) {
+		while (columnGr.next()) {
 			var column = {};
 			column.label = columnGr.getDisplayValue("column_label");
 			column.value = columnGr.getDisplayValue("element");
@@ -311,26 +331,26 @@ GrafanaMetricData.prototype = {
 		gs.info(JSON.stringify(columnArray));
 		return JSON.stringify(columnArray);
 	},
-	getMetricNamesFromCIs: function (ciIdMatch,type) {
+	getMetricNamesFromCIs: function (ciIdMatch, type) {
 		var queryStr = "";
 		var operatingSystems = "";
 		var ciIds = this.getValuesByNameMatch(ciIdMatch, "|");
-		if(ciIds.length<=0)
+		if (ciIds.length <= 0)
 			return '[]';
-		for(c=0;c<ciIds.length;c++)
-			queryStr+=ciIds[c]+",";
+		for (c = 0; c < ciIds.length; c++)
+			queryStr += ciIds[c] + ",";
 
-		if(queryStr.charAt(queryStr.length - 1)==',')
-			queryStr=queryStr.substring(0, queryStr.length - 1);
+		if (queryStr.charAt(queryStr.length - 1) == ',')
+			queryStr = queryStr.substring(0, queryStr.length - 1);
 
-		cmdbQueryStr="sys_idIN"+queryStr;
+		cmdbQueryStr = "sys_idIN" + queryStr;
 		var cmdbGr = new GlideRecord("cmdb_ci");
 		cmdbGr.addEncodedQuery(cmdbQueryStr);
 		cmdbGr.query();
 		while (cmdbGr.next())
 			operatingSystems += cmdbGr.getValue("sys_class_name") + ",";
 
-		queryStr="^cmdb_ci.sys_idIN"+queryStr;
+		queryStr = "^cmdb_ci.sys_idIN" + queryStr;
 		//queryStr="^cmdb_ci.nameIN"+queryStr+"^resource_idISEMPTY";
 
 		var returnMetrics = [];
@@ -344,27 +364,22 @@ GrafanaMetricData.prototype = {
 			var metric_type_id = metricToCiGr.metric_type_id.sys_id.toString();
 			var metricTypeId = metricToCiGr.getDisplayValue("metric_type_id");
 			var metricTinyName = metricToCiGr.metric_type_id.metric_type_tiny_name.toString();
-			if(metricNames.indexOf(metric_tiny_name) === -1 ) 
-			{
+			if (metricNames.indexOf(metric_tiny_name) === -1) {
 				metricNames.push(metric_tiny_name);
 				var metricObj = {};
-				if(type=="GOLDEN")
-				{
-					if(this.isGoldenMetric(metricTypeId)) {
+				if (type == "GOLDEN") {
+					if (this.isGoldenMetric(metricTypeId)) {
 						metricObj.name = metric_tiny_name;
 						metricObj.id = metric_type_id;
 						returnMetrics.push(metricObj);
 					}
-				}
-				else if (type=="CUSTOM_KPIS")
-				{
-					if(this.isCustomKpi(metricTinyName, operatingSystems)) {
+				} else if (type == "CUSTOM_KPIS") {
+					if (this.isCustomKpi(metricTinyName, operatingSystems)) {
 						metricObj.name = metric_tiny_name;
 						metricObj.id = metric_type_id;
 						returnMetrics.push(metricObj);
 					}
-				}
-				else {
+				} else {
 					metricObj.name = metric_tiny_name;
 					metricObj.id = metric_type_id;
 					returnMetrics.push(metricObj);
@@ -374,7 +389,7 @@ GrafanaMetricData.prototype = {
 		returnMetrics.sort();
 		return JSON.stringify(returnMetrics);
 	},
-	getNestedCIS: function(ciId, parentDepth, childDepth, sysparam, type) {
+	getNestedCIS: function (ciId, parentDepth, childDepth, sysparam, type) {
 		var excludedClasses = 'dscy_route_next_hop,cmdb_ci_memory_module,cmdb_ci_disk,cmdb_ci_disk_partition,cmdb_ci_config_file_tracked,	cmdb_ci_ip_address,dscy_router_interface,cmdb_ci_network_adapter,dscy_route_interface,cmdb_ci_file_system';
 		try {
 			var returnValues = [];
@@ -385,7 +400,10 @@ GrafanaMetricData.prototype = {
 				originalIdList.push(ciId);
 				idList.push(ciId);
 			}
-			if (type == "class") returnValues.push({ name: "None", id: ""});
+			if (type == "class") returnValues.push({
+				name: "None",
+				id: ""
+			});
 			var startGr = new GlideRecord("cmdb_ci");
 			startGr.addQuery("sys_id", idList[0]);
 			startGr.query();
@@ -471,7 +489,7 @@ GrafanaMetricData.prototype = {
 						parentObj.id = childGR.parent.sys_id.toString();
 						childObj.name = childGR.child.name.getDisplayValue();
 						childObj.id = childGR.child.sys_id.toString();
-						
+
 						var child_id = childObj.id;
 
 						var parent_class = childGR.parent.sys_class_name.getDisplayValue();
@@ -510,7 +528,7 @@ GrafanaMetricData.prototype = {
 		glide.addEncodedQuery(sysparam);
 		glide.setLimit(limit);
 		glide.query();
-		while(glide.next()) {
+		while (glide.next()) {
 			var obj = {};
 			var newNameColumn = "";
 			var newIdColumn = "";
@@ -523,7 +541,7 @@ GrafanaMetricData.prototype = {
 			} else {
 				obj.name = glide.getDisplayValue(nameColumn);
 			}
-			
+
 			if (idColumn.includes(":d")) {
 				newIdColumn = idColumn.substring(0, idColumn.length - 2);
 				obj.id = glide.getDisplayValue(newIdColumn);
@@ -533,7 +551,7 @@ GrafanaMetricData.prototype = {
 			} else {
 				obj.id = glide.getValue(idColumn);
 			}
-			
+
 			if (alreadyAdded.indexOf(obj.id) == -1) {
 				alreadyAdded.push(obj.id);
 				returnValues.push(obj);
@@ -565,14 +583,16 @@ GrafanaMetricData.prototype = {
 		}
 	},
 	getGenericTrend: function (table, sysparam, esSearch, trendColumn, trendBy, value, startTimeInput, endTimeInput) {
-		var result = [{datapoints: []}];
+		var result = [{
+			datapoints: []
+		}];
 		var totalCount = 0;
-		
+
 		var startTime = new GlideDateTime();
 		startTime.setNumericValue(startTimeInput);
 		var endTime = new GlideDateTime();
 		endTime.setNumericValue(endTimeInput);
-		
+
 		if (table != "") {
 			var trendAg = new GlideAggregate(table);
 			trendAg.addTrend(trendColumn, trendBy, value);
@@ -593,12 +613,12 @@ GrafanaMetricData.prototype = {
 	},
 	queryLogData: function (sysparam, limit, page, sortBy, startTimeInput, endTimeInput, esSearch) {
 		var returnArray = [];
-		
+
 		var startTime = new GlideDateTime();
 		startTime.setNumericValue(startTimeInput);
 		var endTime = new GlideDateTime();
 		endTime.setNumericValue(endTimeInput);
-		
+
 		var pageWindow = this.getPageWindow(limit, page);
 		var logGr = new GlideRecord("sn_occ_log_viewer_parent");
 		logGr.addEncodedQuery("timeBETWEEN" + startTime + "@" + endTime);
@@ -655,7 +675,7 @@ GrafanaMetricData.prototype = {
 		tableGR.query();
 		while (tableGR.next()) {
 			var obj = {};
-			fields.map(function(field) {
+			fields.map(function (field) {
 				if (field.includes(":d")) {
 					field = field.substring(0, field.length - 2);
 					obj[field + ":display"] = tableGR.getDisplayValue(field);
@@ -665,7 +685,7 @@ GrafanaMetricData.prototype = {
 				} else {
 					obj[field] = tableGR.getDisplayValue(field);
 				}
-				
+
 				if (field == "vm_object_id") {
 					obj["subscriptions"] = obj[field].substring(obj[field].indexOf("/", obj[field].indexOf("subscriptions")) + 1, obj[field].indexOf("/", obj[field].indexOf("subscriptions") + 14));
 					obj["resourceGroups"] = obj[field].substring(obj[field].indexOf("/", obj[field].indexOf("resourceGroups")) + 1, obj[field].indexOf("/", obj[field].indexOf("resourceGroups") + 15));
@@ -684,10 +704,10 @@ GrafanaMetricData.prototype = {
 			}
 			returnArray.push(obj);
 		}
-		
+
 		return JSON.stringify(returnArray);
 	},
-	getAggregate: function(table, sysparam, type, column, groupBy, limit) {
+	getAggregate: function (table, sysparam, type, column, groupBy, limit) {
 		var returnArray = [];
 		var tableGA = new GlideAggregate(table);
 		tableGA.addEncodedQuery(sysparam);
@@ -707,13 +727,13 @@ GrafanaMetricData.prototype = {
 	getMetricsClotho: function (ciId, startTimeInput, endTimeInput, sysparam) {
 		var metricStr = "";
 		var startTime = new GlideDateTime();
-		startTime.subtract(startTime.getNumericValue());// gets the date to 0
+		startTime.subtract(startTime.getNumericValue()); // gets the date to 0
 		startTime.add(startTimeInput);
 		var endTime = new GlideDateTime();
 		endTime.subtract(endTime.getNumericValue());
 		endTime.add(endTimeInput);
 		var cis = this.getValuesByNameMatch(ciId, "|");
-		for(var c = 0; c < cis.length; c++) {
+		for (var c = 0; c < cis.length; c++) {
 			var ciTable = "";
 			var ciName = "";
 			var ciGr = new GlideRecord("cmdb_ci");
@@ -730,7 +750,7 @@ GrafanaMetricData.prototype = {
 				metricTableGr.addEncodedQuery(sysparam);
 			metricTableGr.query();
 			try {
-				var metrics = this.getAllMetricsByCi(cis[c]);  // TODO: get from clotho instead of metric to ci table
+				var metrics = this.getAllMetricsByCi(cis[c]); // TODO: get from clotho instead of metric to ci table
 				var builder;
 				var dataSet = '';
 				for (var i = 0; i < metrics.length; i++) {
@@ -743,16 +763,16 @@ GrafanaMetricData.prototype = {
 					var result = builder.execute(startTime, endTime);
 					if (!result || !result.getData()) {
 						gs.warn("No metric transform data for: " + metrics[i]);
-					  continue;
-				  	}
+						continue;
+					}
 					var values = result.getData().getValues();
 					var timestamp = result.getData().getStart().getNumericValue();
 					var period = result.getData().getPeriod() * 1000;
 					metricName = result.getData().getMetricName();
 
-					dataSet+='{"source":"' + ciName + '",';
-					dataSet+='"type":"' + "" + '",';
-					dataSet+='"metricName":"' + metricName + '",';
+					dataSet += '{"source":"' + ciName + '",';
+					dataSet += '"type":"' + "" + '",';
+					dataSet += '"metricName":"' + metricName + '",';
 					dataSet += ' "datapoints": [';
 
 					for (var j = 0; j < values.length; j++) {
@@ -776,81 +796,73 @@ GrafanaMetricData.prototype = {
 				gs.info(err);
 			}
 		}
-		if (metricStr.charAt(metricStr.length - 1) == ",") 
-				metricStr = metricStr.substring(0, metricStr.length - 1);
+		if (metricStr.charAt(metricStr.length - 1) == ",")
+			metricStr = metricStr.substring(0, metricStr.length - 1);
 		return "[" + metricStr + "]";
 	},
-	getSingleMetric: function(ciIdMatch, metricIdMatch, resourceNameMatch,startTimeInput,endTimeInput,sysparam) {
+	getSingleMetricClotho: function (ciIdMatch, metricIdMatch, resourceNameMatch, startTimeInput, endTimeInput, sysparam) {
 		var startTime = new GlideDateTime();
-		startTime.subtract(startTime.getNumericValue());// gets the date to 0
+		startTime.subtract(startTime.getNumericValue()); // gets the date to 0
 		startTime.add(startTimeInput);
-	
+
 		var endTime = new GlideDateTime();
 		endTime.subtract(endTime.getNumericValue());
 		endTime.add(endTimeInput);
-		var metricDataStr="";
+		var metricDataStr = "";
 		//store cis, resourceName, metricNames
 		var ciIds = this.getValuesByNameMatch(ciIdMatch, "|");
 		var metricIds = this.getValuesByNameMatch(metricIdMatch, "|");
 		var resourceNames = [];
-		var resourceQueryStr ="";
-		if(!this.isMatchAll(resourceNameMatch))
-		{
+		var resourceQueryStr = "";
+		if (!this.isMatchAll(resourceNameMatch)) {
 			resourceNames = this.getValuesByNameMatch(resourceNameMatch, "|");
-			for(r=0;r<resourceNames.length;r++)
-				resourceQueryStr+=resourceNames[r]+",";
-			
-			resourceQueryStr="^resource_id.nameIN"+resourceQueryStr;
-			if(resourceQueryStr.charAt(resourceQueryStr.length - 1)==',')
-				resourceQueryStr=resourceQueryStr.substring(0, resourceQueryStr.length - 1);
+			for (r = 0; r < resourceNames.length; r++)
+				resourceQueryStr += resourceNames[r] + ",";
+
+			resourceQueryStr = "^resource_id.nameIN" + resourceQueryStr;
+			if (resourceQueryStr.charAt(resourceQueryStr.length - 1) == ',')
+				resourceQueryStr = resourceQueryStr.substring(0, resourceQueryStr.length - 1);
 
 		}
 
-		for(var c=0;c<ciIds.length;c++) {
-			for(var m=0;m<metricIds.length;m++)
-				{
-					var strQuery='metric_type_id.sys_id='+metricIds[m]+'^cmdb_ci.sys_id='+ciIds[c]+resourceQueryStr;
-					gs.info(strQuery);
-					var resourceObjs=this.getAllResourcesFromMetricTbl(strQuery);
-					
-					for(var r=0;r<resourceObjs.length;r++)
-					{
-						var returnMetricStr=this.getSingleMetricStr(ciIds[c], resourceObjs[r].metricName, resourceObjs[r].resourceName, startTime, endTime, sysparam);
-						if(returnMetricStr.length>0)
-						{
-							metricDataStr+=returnMetricStr;
-							metricDataStr+=",";
-						}
+		for (var c = 0; c < ciIds.length; c++) {
+			for (var m = 0; m < metricIds.length; m++) {
+				var strQuery = 'metric_type_id.sys_id=' + metricIds[m] + '^cmdb_ci.sys_id=' + ciIds[c] + resourceQueryStr;
+				gs.info(strQuery);
+				var resourceObjs = this.getAllResourcesFromMetricTbl(strQuery);
+
+				for (var r = 0; r < resourceObjs.length; r++) {
+					var returnMetricStr = this.getSingleMetricStr(ciIds[c], resourceObjs[r].metricName, resourceObjs[r].resourceName, startTime, endTime, sysparam);
+					if (returnMetricStr.length > 0) {
+						metricDataStr += returnMetricStr;
+						metricDataStr += ",";
 					}
 				}
+			}
 		}
 		//remove last ","
-		if(metricDataStr.charAt(metricDataStr.length - 1)==',')
-			metricDataStr=metricDataStr.substring(0, metricDataStr.length - 1);
-		return '['+metricDataStr+"]";
+		if (metricDataStr.charAt(metricDataStr.length - 1) == ',')
+			metricDataStr = metricDataStr.substring(0, metricDataStr.length - 1);
+		return '[' + metricDataStr + "]";
 	},
 	getSingleMetricStr: function (ciId, metric_name, resourceName, startTime, endTime, sysparam) {
 		var ciGr = new GlideRecord("cmdb_ci");
 		//get table name
 		var ciTable;
-		if(resourceName!="")
-		{
+		if (resourceName != "") {
 			ciGr = new GlideRecord("ci_resource");
 			ciGr.addQuery("cmdb_ci.sys_id", ciId);
 			ciGr.addQuery("name", resourceName);
-		}
-		else
-		{
+		} else {
 			ciGr.addQuery("sys_id", ciId);
 		}
 		ciGr.query();
 		var metricResourceId = ciId;
 		var ciName = ciId;
-		if (ciGr.next())
-		{
+		if (ciGr.next()) {
 			ciTable = ciGr.getValue("sys_class_name");
-			if(resourceName!="") {
-				metricResourceId=ciGr.getValue("sys_id");
+			if (resourceName != "") {
+				metricResourceId = ciGr.getValue("sys_id");
 				ciName = ciGr.cmdb_ci.name.getDisplayValue();
 			} else {
 				ciName = ciGr.getDisplayValue("name");
@@ -858,7 +870,7 @@ GrafanaMetricData.prototype = {
 		}
 		var metricTableGr = new GlideRecord(ciTable);
 		metricTableGr.addQuery("sys_id", metricResourceId);
-		if (sysparam!="")
+		if (sysparam != "")
 			metricTableGr.addEncodedQuery(sysparam);
 		metricTableGr.query();
 		try {
@@ -875,9 +887,9 @@ GrafanaMetricData.prototype = {
 			var period = result.getData().getPeriod() * 1000;
 			var metricName = result.getData().getMetricName();
 
-			var dataSet='{"source":"' + ciName + '",';
-			dataSet+='"type":"' + resourceName + '",';
-			dataSet+='"metricName":"' + metricName + '",';
+			var dataSet = '{"source":"' + ciName + '",';
+			dataSet += '"type":"' + resourceName + '",';
+			dataSet += '"metricName":"' + metricName + '",';
 			dataSet += ' "datapoints": [';
 
 			for (var j = 0; j < values.length; j++) {
@@ -893,7 +905,7 @@ GrafanaMetricData.prototype = {
 				dataSet = dataSet.substring(0, dataSet.length - 1);
 
 			dataSet += ']}';
-		} catch(err) {
+		} catch (err) {
 			return "";
 		}
 		return dataSet;
@@ -901,66 +913,66 @@ GrafanaMetricData.prototype = {
 	getAnomalyMetrics: function (ciId, metricId, resourceNameMatch, startTimeInput, endTimeInput, sysparam) {
 		try {
 			var startTime = new GlideDateTime();
-			startTime.subtract(startTime.getNumericValue());// gets the date to 0
+			startTime.subtract(startTime.getNumericValue()); // gets the date to 0
 			startTime.add(startTimeInput);
 			var endTime = new GlideDateTime();
 			endTime.subtract(endTime.getNumericValue());
 			endTime.add(endTimeInput);
 
-			var resourceId="";
-			var gr= new GlideRecord ("ci_resource_metric_extension");		
-			if(gr.get("name",resourceNameMatch))
-				resourceId=gr.getValue("sys_id");
+			var resourceId = "";
+			var gr = new GlideRecord("ci_resource_metric_extension");
+			if (gr.get("name", resourceNameMatch))
+				resourceId = gr.getValue("sys_id");
 
 			var anomalyMetricData = new global.AnomalyMetricData();
-			metricDataStr=anomalyMetricData.getMetricData(ciId,startTime,endTime,metricId,resourceId);
+			metricDataStr = anomalyMetricData.getMetricData(ciId, startTime, endTime, metricId, resourceId);
 			return metricDataStr;
 		} catch (e) {
 			return e;
 		}
-		
+
 	},
-	getAlerts: function(ciId, alertType, alertState, sysparam, limit, page, sortBy) {
-		var dataStr="";
-		var alertStateFilter="Open,Reopen";
+	getAlerts: function (ciId, alertType, alertState, sysparam, limit, page, sortBy) {
+		var dataStr = "";
+		var alertStateFilter = "Open,Reopen";
 		if (alertState == "All")
-			alertStateFilter="Open,Reopen,Closed";
-		var sysparam_query="";
+			alertStateFilter = "Open,Reopen,Closed";
+		var sysparam_query = "";
 		if (sysparam != "")
 			sysparam_query = sysparam;
-		var cis =[];
-		if(alertType=="service")
+		var cis = [];
+		if (alertType == "service")
 			cis = this.getAllCIsInService(ciId);
-		else if (alertType=="ci")
+		else if (alertType == "ci")
 			cis = this.getValuesByNameMatch(ciId, "|");
-		else if (alertType=="none")
-			cis=[""];
-		
-		for(var i=0;i<cis.length;i++) {
-			var alertsbyCI=this.getAlertsByCI(cis[i],alertStateFilter,sysparam_query, limit, page, sortBy);
+		else if (alertType == "none")
+			cis = [""];
+
+		for (var i = 0; i < cis.length; i++) {
+			var alertsbyCI = this.getAlertsByCI(cis[i], alertStateFilter, sysparam_query, limit, page, sortBy);
 			if (alertsbyCI.length > 0)
 				dataStr += alertsbyCI + ",";
 		}
-		
-		if(dataStr.charAt(dataStr.length - 1)==',')
-			dataStr=dataStr.substring(0, dataStr.length - 1);
-		return '['+dataStr+"]";
+
+		if (dataStr.charAt(dataStr.length - 1) == ',')
+			dataStr = dataStr.substring(0, dataStr.length - 1);
+		return '[' + dataStr + "]";
 	},
 	getChanges: function (ciId, alertType, sysparam, limit, page) {
 		var dataStr = "";
-		var sysparam_query="";
+		var sysparam_query = "";
 		if (sysparam != "")
 			sysparam_query = sysparam;
-		var cis =[];
-		if(alertType=="service")
+		var cis = [];
+		if (alertType == "service")
 			cis = this.getAllCIsInService(ciId);
-		else if (alertType=="ci")
+		else if (alertType == "ci")
 			cis = this.getValuesByNameMatch(ciId, "|");
-		else if (alertType=="none")
-			cis=[""];
-		
-		for(var i=0;i<cis.length;i++) {
-			var changesByCI=this.getChangesByCI(cis[i], sysparam_query, limit, page);
+		else if (alertType == "none")
+			cis = [""];
+
+		for (var i = 0; i < cis.length; i++) {
+			var changesByCI = this.getChangesByCI(cis[i], sysparam_query, limit, page);
 			if (changesByCI.length > 0)
 				dataStr += changesByCI + ",";
 		}
@@ -970,7 +982,7 @@ GrafanaMetricData.prototype = {
 	},
 	getTopology: function (serviceId, childDepth, parentDepth, sysparam_query) {
 		var excludedClasses = 'dscy_route_next_hop,cmdb_ci_memory_module,cmdb_ci_disk,cmdb_ci_disk_partition,cmdb_ci_config_file_tracked,	cmdb_ci_ip_address,dscy_router_interface,cmdb_ci_network_adapter,dscy_route_interface,cmdb_ci_file_system';
-		var topologyRows='{"rows": [';
+		var topologyRows = '{"rows": [';
 		var childDepthLimit = 3;
 		var parentDepthLimit = 0;
 		if (childDepth != "" && childDepth >= 0)
@@ -993,7 +1005,7 @@ GrafanaMetricData.prototype = {
 				name = name.replace(/\\/g, "/");
 				var className = startGR.getDisplayValue("sys_class_name");
 				var sys_id = startGR.getValue("sys_id");
-				var alertCount = this.getAlertsCountByCI(parentIds[0],"","Open,Reopen");
+				var alertCount = this.getAlertsCountByCI(parentIds[0], "", "Open,Reopen");
 				if (alertCount == 0) alertCount = -1;
 				var childRow = '["' + className + '",' + 0 + ',"' + "Starting Point||0" + '","' + name + "||" + sys_id + '",' + alertCount + ',' + -1 + '],';
 				topologyRows += childRow;
@@ -1023,9 +1035,9 @@ GrafanaMetricData.prototype = {
 							parentObj.child_name = parentGR.child.name.toString();
 							parentObj.child_name = parentObj.child_name.replace(/\\/g, "/");
 							parentObj.child_id = parentGR.child.sys_id.toString();
-							
-							var alertCount = this.getAlertsCountByCI(parentObj.parent_id,"","Open,Reopen");
-							if (alertCount == 0) 
+
+							var alertCount = this.getAlertsCountByCI(parentObj.parent_id, "", "Open,Reopen");
+							if (alertCount == 0)
 								alertCount = -1;
 							var childRow = '["' + parentObj.parent_class + '",' + 0 + ',"' + parentObj.child_name + "||" + parentObj.child_id + '","' + parentObj.parent_name + "||" + parentObj.parent_id + '",' + alertCount + ',' + -1 + '],';
 							topologyRows += childRow;
@@ -1047,12 +1059,12 @@ GrafanaMetricData.prototype = {
 						}
 					}
 				}
-				parentIds=nextChildIds;
+				parentIds = nextChildIds;
 				parentDepthLimit -= 1;
 			}
 
 			if (parentDepthLimit == 0 && originalIds.length > 0) {
-				parentIds=originalIds;
+				parentIds = originalIds;
 			}
 
 			while (childDepthLimit > 0) {
@@ -1079,8 +1091,8 @@ GrafanaMetricData.prototype = {
 							childObj.child_name = childObj.child_name.replace(/\\/g, "/");
 							childObj.child_class = childGR.child.sys_class_name.getDisplayValue();
 							childObj.child_class_value = childGR.child.sys_class_name.toString();
-							
-							var alertCount = this.getAlertsCountByCI(childObj.child_id,"","Open,Reopen");
+
+							var alertCount = this.getAlertsCountByCI(childObj.child_id, "", "Open,Reopen");
 							if (alertCount == 0) alertCount = -1;
 							var childRow = '["' + childObj.child_class + '",' + 0 + ',"' + childObj.parent_name + "||" + childObj.parent_id + '","' + childObj.child_name + "||" + childObj.child_id + '",' + alertCount + ',' + -1 + '],';
 							topologyRows += childRow;
@@ -1106,9 +1118,9 @@ GrafanaMetricData.prototype = {
 				childDepthLimit -= 1;
 			}
 
-			if(topologyRows.charAt(topologyRows.length - 1)==',')
-				topologyRows=topologyRows.substring(0, topologyRows.length - 1);
-			topologyRows+="]}";
+			if (topologyRows.charAt(topologyRows.length - 1) == ',')
+				topologyRows = topologyRows.substring(0, topologyRows.length - 1);
+			topologyRows += "]}";
 			return topologyRows;
 		} catch (error) {
 			return error;
@@ -1116,40 +1128,39 @@ GrafanaMetricData.prototype = {
 	},
 	getAllMetrics: function (sysparam) {
 		var gr = new GlideRecord('sa_metric_map');
-		var returnStr="";
-		if(sysparam.length>0)
+		var returnStr = "";
+		if (sysparam.length > 0)
 			gr.addEncodedQuery(sysparam);
 		gr.query();
-		while (gr.next())
-		{	
+		while (gr.next()) {
 			var obj = new Object();
-			obj.sys_created_on=gr.getValue("sys_created_on");
-			obj.metric_type_id= gr.getDisplayValue("metric_type_id");
-			obj.metric_tiny_name= gr.metric_type_id.metric_type_tiny_name.toString();
+			obj.sys_created_on = gr.getValue("sys_created_on");
+			obj.metric_type_id = gr.getDisplayValue("metric_type_id");
+			obj.metric_tiny_name = gr.metric_type_id.metric_type_tiny_name.toString();
 			obj.ci = gr.getDisplayValue("cmdb_ci");
 			obj.resource_id = gr.getDisplayValue("resource_id");
 			obj.resource = gr.getDisplayValue("resource");
-			obj.source= gr.getDisplayValue("source");
-			var jsonString= JSON.stringify(obj);
-			returnStr+=jsonString;
-			returnStr+=",";
+			obj.source = gr.getDisplayValue("source");
+			var jsonString = JSON.stringify(obj);
+			returnStr += jsonString;
+			returnStr += ",";
 
 		}
 		if (returnStr.charAt(returnStr.length - 1) == ",")
-			returnStr=returnStr.substring(0, returnStr.length - 1);
+			returnStr = returnStr.substring(0, returnStr.length - 1);
 
-		return '['+returnStr+"]";
+		return '[' + returnStr + "]";
 	},
 	getCISummary: function (ciIdMatch, sysparam) {
 		var cis = this.getValuesByNameMatch(ciIdMatch, "|");
-		var cisSummary="";
+		var cisSummary = "";
 		for (var i = 0; i < cis.length; i++) {
 			cisSummary += this.getCISummaryStr(cis[i], sysparam) + ",";
 		}
 		if (cisSummary.charAt(cisSummary.length - 1) == ",")
 			cisSummary = cisSummary.substring(0, cisSummary.length - 1);
-		
-		return "["+cisSummary+"]";
+
+		return "[" + cisSummary + "]";
 	},
 	getACCAgents: function (filter, metricNameMatch, startTimeInput, endTimeInput, sysParamQuery, filterTypeStr, limit, page) {
 		var agentFilter = "";
@@ -1157,29 +1168,29 @@ GrafanaMetricData.prototype = {
 			if (filter.indexOf("(") != -1) filter = filter.substring(filter.indexOf("(") + 1, filter.indexOf(")"));
 			agentFilter = filter;
 		}
-		var sysparam="";
-		if (sysParamQuery != "") 
-			sysparam=sysParamQuery;
+		var sysparam = "";
+		if (sysParamQuery != "")
+			sysparam = sysParamQuery;
 		var filterType = "os";
 		if (filterTypeStr != "")
 			filterType = filterTypeStr;
 		var startTime = new GlideDateTime();
-		startTime.subtract(startTime.getNumericValue());// gets the date to 0
+		startTime.subtract(startTime.getNumericValue()); // gets the date to 0
 		startTime.add(startTimeInput);
 		var endTime = new GlideDateTime();
 		endTime.subtract(endTime.getNumericValue());
 		endTime.add(endTimeInput);
-		var cmdbId ="";
-		var dataStr="";
-		var returnStr="";
+		var cmdbId = "";
+		var dataStr = "";
+		var returnStr = "";
 		//get ACC agents 
 		var filterArray = this.getValuesByNameMatch(agentFilter, "|");
 		var pageWindow = this.getPageWindow(limit, page);
-		var accAgentsCIs= new  GlideRecord("sn_agent_cmdb_ci_agent");
+		var accAgentsCIs = new GlideRecord("sn_agent_cmdb_ci_agent");
 		accAgentsCIs.addEncodedQuery(sysparam);
 		if (filterArray.length > 0) {
 			var extraQuery;
-			for(var i = 0; i < filterArray.length; i++) {
+			for (var i = 0; i < filterArray.length; i++) {
 				if (i == 0) {
 					if (filterType == "os") {
 						extraQuery = accAgentsCIs.addQuery('agent_extended_info.cmdb_ci.sys_class_name', filterArray[i]);
@@ -1198,40 +1209,35 @@ GrafanaMetricData.prototype = {
 		accAgentsCIs.setLimit(limit);
 		accAgentsCIs.chooseWindow(pageWindow[0], pageWindow[1]);
 		accAgentsCIs.query();
-		while (accAgentsCIs.next())
-		{
+		while (accAgentsCIs.next()) {
 			var accObject = new Object();
-			accObject.name=accAgentsCIs.getValue("name");
-			if(accObject.name!=null)
-			{
-				accObject.agent_status=accAgentsCIs.agent_extended_info.status.getDisplayValue();
-				accObject.host=accAgentsCIs.agent_extended_info.cmdb_ci.getDisplayValue();
-				accObject.host_sys_id=accAgentsCIs.agent_extended_info.cmdb_ci.sys_id.toString();
-				accObject.ci_class=accAgentsCIs.agent_extended_info.cmdb_ci.sys_class_name.getDisplayValue();
-				accObject.ci_class_table=accAgentsCIs.agent_extended_info.cmdb_ci.sys_class_name.toString();
-				accObject.agent_sys_id=accAgentsCIs.getValue("sys_id");
-				accObject.num_of_running_checks=accAgentsCIs.agent_extended_info.running_checks_num.getDisplayValue();
-				accObject.data_collect=accAgentsCIs.agent_extended_info.data_collection.getDisplayValue();
-				accObject.version=accAgentsCIs.agent_extended_info.agent_version.getDisplayValue();
-				accObject.last_refreshed=accAgentsCIs.agent_extended_info.last_refreshed.getDisplayValue();
-				accObject.ip=accAgentsCIs.getDisplayValue("ip_address");
-				accObject.os=accAgentsCIs.agent_extended_info.cmdb_ci.os.getDisplayValue();
-				accObject.cpu_count=accAgentsCIs.agent_extended_info.cmdb_ci.cpu_count.getDisplayValue();
-				accObject.cpu_name=accAgentsCIs.agent_extended_info.cmdb_ci.cpu_name.getDisplayValue();
-				accObject.ram=accAgentsCIs.agent_extended_info.cmdb_ci.ram.getDisplayValue();
-				accObject.hardware_status=accAgentsCIs.agent_extended_info.cmdb_ci.hardware_status.getDisplayValue();
-				accObject.fqdn=accAgentsCIs.agent_extended_info.cmdb_ci.fqdn.getDisplayValue();
-				accObject.last_discovered=accAgentsCIs.agent_extended_info.cmdb_ci.last_discovered.getDisplayValue();
-				accObject.used_for=accAgentsCIs.agent_extended_info.cmdb_ci.used_for.getDisplayValue();
-				accObject.subcategory=accAgentsCIs.agent_extended_info.cmdb_ci.subcategory.getDisplayValue();
-				accObject.virtual=accAgentsCIs.agent_extended_info.cmdb_ci.virtual.getDisplayValue();
+			accObject.name = accAgentsCIs.getValue("name");
+			if (accObject.name != null) {
+				accObject.agent_status = accAgentsCIs.agent_extended_info.status.getDisplayValue();
+				accObject.host = accAgentsCIs.agent_extended_info.cmdb_ci.getDisplayValue();
+				accObject.host_sys_id = accAgentsCIs.agent_extended_info.cmdb_ci.sys_id.toString();
+				accObject.ci_class = accAgentsCIs.agent_extended_info.cmdb_ci.sys_class_name.getDisplayValue();
+				accObject.ci_class_table = accAgentsCIs.agent_extended_info.cmdb_ci.sys_class_name.toString();
+				accObject.agent_sys_id = accAgentsCIs.getValue("sys_id");
+				accObject.num_of_running_checks = accAgentsCIs.agent_extended_info.running_checks_num.getDisplayValue();
+				accObject.data_collect = accAgentsCIs.agent_extended_info.data_collection.getDisplayValue();
+				accObject.version = accAgentsCIs.agent_extended_info.agent_version.getDisplayValue();
+				accObject.last_refreshed = accAgentsCIs.agent_extended_info.last_refreshed.getDisplayValue();
+				accObject.ip = accAgentsCIs.getDisplayValue("ip_address");
+				accObject.os = accAgentsCIs.agent_extended_info.cmdb_ci.os.getDisplayValue();
+				accObject.cpu_count = accAgentsCIs.agent_extended_info.cmdb_ci.cpu_count.getDisplayValue();
+				accObject.cpu_name = accAgentsCIs.agent_extended_info.cmdb_ci.cpu_name.getDisplayValue();
+				accObject.ram = accAgentsCIs.agent_extended_info.cmdb_ci.ram.getDisplayValue();
+				accObject.hardware_status = accAgentsCIs.agent_extended_info.cmdb_ci.hardware_status.getDisplayValue();
+				accObject.fqdn = accAgentsCIs.agent_extended_info.cmdb_ci.fqdn.getDisplayValue();
+				accObject.last_discovered = accAgentsCIs.agent_extended_info.cmdb_ci.last_discovered.getDisplayValue();
+				accObject.used_for = accAgentsCIs.agent_extended_info.cmdb_ci.used_for.getDisplayValue();
+				accObject.subcategory = accAgentsCIs.agent_extended_info.cmdb_ci.subcategory.getDisplayValue();
+				accObject.virtual = accAgentsCIs.agent_extended_info.cmdb_ci.virtual.getDisplayValue();
 
-				if (accObject.ci_class=="Linux Server")
-				{
+				if (accObject.ci_class == "Linux Server") {
 					accObject.image_url = "https://www.freeiconspng.com/uploads/linux-icon-2.png";
-				}
-				else if (accObject.ci_class=="Windows Server")
-				{
+				} else if (accObject.ci_class == "Windows Server") {
 					accObject.image_url = "https://www.freeiconspng.com/thumbs/windows-icon-png/cute-ball-windows-icon-png-16.png";
 				}
 
@@ -1244,24 +1250,22 @@ GrafanaMetricData.prototype = {
 					accObject.image_url = "https://cdn2.iconfinder.com/data/icons/mixd/512/20_kubernetes-512.png";
 				}
 
-				if (metricNameMatch!="") {
+				if (metricNameMatch != "") {
 					var metricNames = this.getValuesByNameMatch(metricNameMatch, "|");
-					for(var m=0;m<metricNames.length;m++)
-					{
+					for (var m = 0; m < metricNames.length; m++) {
 						var realMetricName = "";
-						switch (metricNames[m].toLowerCase())
-						{
+						switch (metricNames[m].toLowerCase()) {
 							case 'cpu':
-								if (accObject.ci_class=="Linux Server") {
+								if (accObject.ci_class == "Linux Server") {
 									realMetricName = "cpu_system_percentage";
-								} else if (accObject.ci_class=="Windows Server") {
+								} else if (accObject.ci_class == "Windows Server") {
 									realMetricName = "cpu_loadavgsec";
 								}
 								break;
 							case 'memory':
-								if (accObject.ci_class=="Linux Server") {
+								if (accObject.ci_class == "Linux Server") {
 									realMetricName = "memory_percent_available";
-								} else if (accObject.ci_class=="Windows Server") {
+								} else if (accObject.ci_class == "Windows Server") {
 									realMetricName = "ram_usage_percentage";
 								}
 								break;
@@ -1272,9 +1276,8 @@ GrafanaMetricData.prototype = {
 								break;
 						}
 						var metricStr = "";
-						var returnMetricStr=this.getSingleMetricStr(accObject.host_sys_id, realMetricName, "", startTime, endTime, "");
-						if(returnMetricStr.length>0)
-						{
+						var returnMetricStr = this.getSingleMetricStr(accObject.host_sys_id, realMetricName, "", startTime, endTime, "");
+						if (returnMetricStr.length > 0) {
 							//Only grabs the first datapoint
 							gs.info(returnMetricStr);
 							var datapointsIndex = returnMetricStr.indexOf("datapoints");
@@ -1296,19 +1299,19 @@ GrafanaMetricData.prototype = {
 						accObject[metricNames[m]] = returnMetricStr;
 					}
 				}
-				var jsonString= JSON.stringify(accObject);
+				var jsonString = JSON.stringify(accObject);
 				gs.info(jsonString);
-				dataStr+=jsonString;
-				dataStr+=",";
+				dataStr += jsonString;
+				dataStr += ",";
 			}
 		}
-		if(dataStr.charAt(dataStr.length - 1)==',')
-			dataStr=dataStr.substring(0, dataStr.length - 1);
-		return '['+dataStr+"]";
+		if (dataStr.charAt(dataStr.length - 1) == ',')
+			dataStr = dataStr.substring(0, dataStr.length - 1);
+		return '[' + dataStr + "]";
 	},
 	queryGeohashMap: function (table, regionColumn, sysparam) {
 		var aggArray = JSON.parse(this.getAggregate(table, sysparam, 'COUNT', 'vm_sys_id', regionColumn));
-		for(var i = 0; i < aggArray.length; i++) {
+		for (var i = 0; i < aggArray.length; i++) {
 			aggArray[i].geohash = this.getGeohash(aggArray[i][regionColumn]);
 		}
 		return JSON.stringify(aggArray);
@@ -1436,9 +1439,9 @@ GrafanaMetricData.prototype = {
 			case 'japanwest':
 				geohash = 'xn0m77v9tm927';
 				break;
-// 			case 'jioindiawest':
-// 				geohash = '';
-// 				break;
+				// 			case 'jioindiawest':
+				// 				geohash = '';
+				// 				break;
 			case 'koreacentral':
 				geohash = 'wydm9qy8cjsnh';
 				break;
@@ -1513,7 +1516,7 @@ GrafanaMetricData.prototype = {
 		}
 		return geohash;
 	},
-	
+
 	// Helper Methods
 	getPageWindow: function (limit, page) {
 		var pageWindow = [];
@@ -1538,15 +1541,15 @@ GrafanaMetricData.prototype = {
 		}
 		return returnArray;
 	},
-	getAlertsCountByCI: function (ciId,filter,alertState) {
-		
+	getAlertsCountByCI: function (ciId, filter, alertState) {
+
 		var alertGr = new GlideRecord('em_alert');
-		alertGr.addQuery('state','IN',alertState);
+		alertGr.addQuery('state', 'IN', alertState);
 		//alertGr.addQuery('sys_created_on','<=',gs.daysAgo(7));
 		alertGr.addQuery("cmdb_ci.sys_id", ciId);
 
 		alertGr.query();
-		var alertsStr="";
+		var alertsStr = "";
 		var count = alertGr.getRowCount();
 		return count;
 	},
@@ -1591,7 +1594,7 @@ GrafanaMetricData.prototype = {
 		gr.query();
 
 		while (gr.next()) {
-			if(gr.source_metrics_types.getDisplayValue().contains(metricName))
+			if (gr.source_metrics_types.getDisplayValue().contains(metricName))
 				return true;
 		}
 		return false;
@@ -1625,7 +1628,7 @@ GrafanaMetricData.prototype = {
 					var begin = new GlideDateTime(outageGr.getValue("begin"));
 					var end = new GlideDateTime(outageGr.getValue("end"));
 					var type = outageGr.getDisplayValue("type");
-					
+
 					if (begin) {
 						outages.datapoints.push([type, begin.getNumericValue()]);
 						if (end) {
@@ -1633,11 +1636,11 @@ GrafanaMetricData.prototype = {
 						} else {
 							outages.datapoints.push([type, date.getNumericValue()]);
 						}
-							
+
 					}
-					
+
 					if (begin && end)
-						actualUptime -= (end.getNumericValue()*0.001) - (begin.getNumericValue()*0.001);
+						actualUptime -= (end.getNumericValue() * 0.001) - (begin.getNumericValue() * 0.001);
 				}
 			} else {
 				outages.datapoints.push(["Operational", date.getNumericValue()]);
@@ -1686,44 +1689,42 @@ GrafanaMetricData.prototype = {
 		}
 	},
 	getCISummaryStr: function (ciId, sysparam) {
-		var ciSummaryStr="";
-		var gr= new GlideRecord("cmdb_ci");
+		var ciSummaryStr = "";
+		var gr = new GlideRecord("cmdb_ci");
 		if (sysparam != "")
 			gr.addEncodedQuery(sysparam);
 		gr.addQuery("sys_id", ciId);
 		gr.query();
-		if(gr.next())
-		{
+		if (gr.next()) {
 			var ciSummary = new Object();
-			ciSummary.name=gr.getDisplayValue("name");
-			ciSummary.classType=gr.getDisplayValue("sys_class_name");
-			ciSummary.environment=gr.getDisplayValue("environment")|| " ";
-			ciSummary.maintenance_schedule=gr.getDisplayValue("maintenance_schedule")|| "NO";
-			ciSummary.support_group=gr.getDisplayValue("support_group")|| " ";
-			
-			var jsonString= JSON.stringify(ciSummary);
-			ciSummaryStr+=jsonString;
-			ciSummaryStr+=",";
+			ciSummary.name = gr.getDisplayValue("name");
+			ciSummary.classType = gr.getDisplayValue("sys_class_name");
+			ciSummary.environment = gr.getDisplayValue("environment") || " ";
+			ciSummary.maintenance_schedule = gr.getDisplayValue("maintenance_schedule") || "NO";
+			ciSummary.support_group = gr.getDisplayValue("support_group") || " ";
+
+			var jsonString = JSON.stringify(ciSummary);
+			ciSummaryStr += jsonString;
+			ciSummaryStr += ",";
 		}
 		if (ciSummaryStr.charAt(ciSummaryStr.length - 1) == ",")
-			ciSummaryStr=ciSummaryStr.substring(0, ciSummaryStr.length - 1);
-		
-		return(ciSummaryStr);
+			ciSummaryStr = ciSummaryStr.substring(0, ciSummaryStr.length - 1);
+
+		return (ciSummaryStr);
 	},
 	getAllCIsInService: function (serviceId) {
 		var cis = [];
-        var childrenCIs= new  GlideRecord("em_impact_graph");
+		var childrenCIs = new GlideRecord("em_impact_graph");
 		childrenCIs.addQuery("business_service", serviceId);
 		childrenCIs.query();
-        while (childrenCIs.next())
-        {
+		while (childrenCIs.next()) {
 			var name = childrenCIs.getDisplayValue("child_name");
 			var id = childrenCIs.getValue("child_id");
 			if (name != "" && cis.indexOf(id) == -1) {
 				cis.push(id);
 			}
-        }
-        return cis;
+		}
+		return cis;
 	},
 	getChangesByCI: function (ciId, sysparam_query, limit, page) {
 		var pageWindow = this.getPageWindow(limit, page);
@@ -1762,10 +1763,10 @@ GrafanaMetricData.prototype = {
 	getAlertsByCI: function (ciId, filter, query, limit, page, sortBy) {
 		var queryFilter;
 		if (filter != "")
-			queryFilter=filter;
+			queryFilter = filter;
 		var sysparam_query;
 		if (query != "")
-			sysparam_query=query;
+			sysparam_query = query;
 		var impactedServiceSysparam = "";
 		if (sysparam_query.includes("impactedServices")) {
 			var startIndex = sysparam_query.indexOf("impactedServices") + 16;
@@ -1781,7 +1782,7 @@ GrafanaMetricData.prototype = {
 		var pageWindow = this.getPageWindow(limit, page);
 		var alertGr = new GlideRecord('em_alert');
 		if (queryFilter) {
-			alertGr.addQuery('state','IN',queryFilter);
+			alertGr.addQuery('state', 'IN', queryFilter);
 		}
 		if (sysparam_query) {
 			alertGr.addEncodedQuery(sysparam_query);
@@ -1794,42 +1795,41 @@ GrafanaMetricData.prototype = {
 		alertGr.chooseWindow(pageWindow[0], pageWindow[1]);
 		alertGr.orderBy(sortBy);
 		alertGr.query();
-		var alertsStr="";
+		var alertsStr = "";
 		var count = alertGr.getRowCount();
-		
-		while (alertGr.next())
-        {	
+
+		while (alertGr.next()) {
 			var alert = new Object();
-			alert.sys_created_on= alertGr.getDisplayValue("sys_created_on");
-			
-			alert.AlertId=alertGr.getValue("number");
-			alert.Incident=alertGr.getDisplayValue("incident");
-			alert.IncidentSysID=alertGr.getValue("incident");
+			alert.sys_created_on = alertGr.getDisplayValue("sys_created_on");
+
+			alert.AlertId = alertGr.getValue("number");
+			alert.Incident = alertGr.getDisplayValue("incident");
+			alert.IncidentSysID = alertGr.getValue("incident");
 			alert.incidentPriority = parseInt(alertGr.incident.priority.toString());
-			alert.Group=alertGr.getDisplayValue("group_source");
-			alert.Severity  = alertGr.getDisplayValue("severity");
-			alert.Priortity =alertGr.getDisplayValue("sn_priority_group");
-			alert.State  = alertGr.getDisplayValue("state");
-			alert.Acknowledged =alertGr.getDisplayValue("acknowledged");
-			alert.Summary=alertGr.getDisplayValue("message_key");
-			alert.CI=alertGr.getDisplayValue("cmdb_ci");
+			alert.Group = alertGr.getDisplayValue("group_source");
+			alert.Severity = alertGr.getDisplayValue("severity");
+			alert.Priortity = alertGr.getDisplayValue("sn_priority_group");
+			alert.State = alertGr.getDisplayValue("state");
+			alert.Acknowledged = alertGr.getDisplayValue("acknowledged");
+			alert.Summary = alertGr.getDisplayValue("message_key");
+			alert.CI = alertGr.getDisplayValue("cmdb_ci");
 			alert.CIClass = alertGr.cmdb_ci.sys_class_name.getDisplayValue();
 			alert.CISysID = alertGr.getValue("cmdb_ci");
-			alert.MetricName=alertGr.getDisplayValue("metric_name");
-			alert.Resource=alertGr.getDisplayValue("resource");
-			alert.Source=alertGr.getDisplayValue("source");
-			alert.Maintenance=alertGr.getDisplayValue("maintenance");
-			alert.Description=alertGr.getValue("description");
-			alert.EventCount=parseInt(alertGr.getValue("event_count"));
-			alert.IsGroup=alertGr.getDisplayValue("is_group_alert");
-			alert.SeverityNum  = parseInt(alertGr.getValue("severity"));
-			alert.PriortityNum =parseInt(alertGr.getValue("sn_priority_group"));
-			alert.Updated=alertGr.getDisplayValue("sys_updated_on");
+			alert.MetricName = alertGr.getDisplayValue("metric_name");
+			alert.Resource = alertGr.getDisplayValue("resource");
+			alert.Source = alertGr.getDisplayValue("source");
+			alert.Maintenance = alertGr.getDisplayValue("maintenance");
+			alert.Description = alertGr.getValue("description");
+			alert.EventCount = parseInt(alertGr.getValue("event_count"));
+			alert.IsGroup = alertGr.getDisplayValue("is_group_alert");
+			alert.SeverityNum = parseInt(alertGr.getValue("severity"));
+			alert.PriortityNum = parseInt(alertGr.getValue("sn_priority_group"));
+			alert.Updated = alertGr.getDisplayValue("sys_updated_on");
 			alert.last_event_time = this.convertSysCreatedStrToMS(alertGr.getValue("last_event_time"));
-			alert.sys_id=alertGr.getValue("sys_id");
-			alert.additional_info=alertGr.getValue("additional_info");
+			alert.sys_id = alertGr.getValue("sys_id");
+			alert.additional_info = alertGr.getValue("additional_info");
 			alert.uiAction = "UI Actions";
-			
+
 			try {
 				var additional_info_json = JSON.parse(alert.additional_info);
 				alert.anomaly_count = parseInt(additional_info_json.sn_anomaly_current);
@@ -1838,14 +1838,14 @@ GrafanaMetricData.prototype = {
 			}
 			alert.node = alertGr.getDisplayValue("node");
 			alert.start_time = this.convertSysCreatedStrToMS(alertGr.getValue("sys_created_on"));
-			
+
 			alert.secondary_alerts = 0;
 			if (alert.Group != "Secondary" && alert.Group != "") {
 				alert.drilldownSysID = alert.sys_id;
 				var secondaryGr = new GlideAggregate("em_alert");
 				secondaryGr.addQuery("parent", alert.sys_id);
-// 				if (queryFilter) 
-// 					secondaryGr.addQuery('state','IN',queryFilter);
+				// 				if (queryFilter) 
+				// 					secondaryGr.addQuery('state','IN',queryFilter);
 				secondaryGr.addAggregate("COUNT", "sys_id");
 				secondaryGr.groupBy("parent");
 				secondaryGr.query();
@@ -1855,7 +1855,7 @@ GrafanaMetricData.prototype = {
 			} else {
 				alert.drilldownSysID = alertGr.getValue("parent");
 			}
-			
+
 			alert.impactedServicesCount = alertGr.getValue('sn_services');
 			var alertsInGroup = new global.EvtMgmtAlertsInGroupAPI();
 			var allImpactedServices = alertsInGroup.getImpactedServicesForAlert(alert.sys_id);
@@ -1869,45 +1869,45 @@ GrafanaMetricData.prototype = {
 				alert.impactedServiceSysIDs += serviceGr.getValue("sys_id") + ", ";
 				alert.impactedServices += serviceGr.getDisplayValue("name") + ", ";
 			}
-			
+
 			if (alert.impactedServiceSysIDs.charAt(alert.impactedServiceSysIDs.length - 1) == " ")
 				alert.impactedServiceSysIDs = alert.impactedServiceSysIDs.substring(0, alert.impactedServiceSysIDs.length - 2);
-			
+
 			if (alert.impactedServices.charAt(alert.impactedServices.length - 1) == " ")
 				alert.impactedServices = alert.impactedServices.substring(0, alert.impactedServices.length - 2);
-			
+
 			var addRow = true;
 			if (impactedServiceSysparam != "") {
 				if (alert.impactedServices.includes(impactedServiceSysparam) == false) {
 					addRow = false;
 				}
 			}
-			
+
 			if (addRow) {
-				var jsonString= JSON.stringify(alert);
-				alertsStr+=jsonString;
-				alertsStr+=",";
+				var jsonString = JSON.stringify(alert);
+				alertsStr += jsonString;
+				alertsStr += ",";
 			}
 		}
 		if (alertsStr.charAt(alertsStr.length - 1) == ",")
-			alertsStr=alertsStr.substring(0, alertsStr.length - 1);
-		
-		return(alertsStr);
+			alertsStr = alertsStr.substring(0, alertsStr.length - 1);
+
+		return (alertsStr);
 	},
 	getAllResourcesFromMetricTbl: function (strQuery) {
 		var resources = [];
-		
+
 		var metricToCiGr = new GlideRecord('sa_metric_map');
 		metricToCiGr.addEncodedQuery(strQuery);
 		metricToCiGr.query();
 
 		while (metricToCiGr.next()) {
 			var resource = {};
-			resource.resourceName= metricToCiGr.getDisplayValue("resource_id");
+			resource.resourceName = metricToCiGr.getDisplayValue("resource_id");
 			resource.metricName = metricToCiGr.metric_type_id.metric_type_tiny_name.toString();
 			resources.push(resource);
 		}
-		
+
 		return resources;
 	},
 	getAllMetricsByCi: function (ciId) {
@@ -1918,7 +1918,7 @@ GrafanaMetricData.prototype = {
 		metricToCiGr.query();
 		while (metricToCiGr.next()) {
 			var metric = metricToCiGr.metric_type_id.metric_type_tiny_name.toString();
-			gs.info("MetricTinyNames: "+metric);
+			gs.info("MetricTinyNames: " + metric);
 			metrics.push(metric);
 		}
 		return metrics;
@@ -1928,31 +1928,31 @@ GrafanaMetricData.prototype = {
 		gdt.setValue(timeStr);
 		return gdt.getNumericValue();
 	},
-	isRegEx: function(str) {
-		if((str.charAt(0)=='/') && (str.charAt(str.length-1)=='/'))
+	isRegEx: function (str) {
+		if ((str.charAt(0) == '/') && (str.charAt(str.length - 1) == '/'))
 			return true;
 
 		return false;
 	},
-	getValuesByNameMatch: function (matchStr,seperator) {
+	getValuesByNameMatch: function (matchStr, seperator) {
 		var values = [];
-		if(this.isRegEx(matchStr)) {
-			matchStr=matchStr.substring(1, matchStr.length - 1);
+		if (this.isRegEx(matchStr)) {
+			matchStr = matchStr.substring(1, matchStr.length - 1);
 			if (matchStr.charAt(0) == "(")
 				matchStr = matchStr.substring(1, matchStr.length - 1);
 		}
-			
+
 		values = matchStr.split(seperator);
 		return values;
 	},
 	isMatchAll: function (input) {
-		if(input=='*'  || input=='\*' || input=='\.*\\')
+		if (input == '*' || input == '\*' || input == '\.*\\')
 			return true;
 
 		return false;
 	},
 
-    type: 'GrafanaMetricData'
+	type: 'GrafanaMetricData'
 };]]></script>
         <sys_class_name>sys_script_include</sys_class_name>
         <sys_created_by>optimiz</sys_created_by>
